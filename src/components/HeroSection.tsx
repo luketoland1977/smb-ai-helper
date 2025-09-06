@@ -8,12 +8,12 @@ const HeroSection = () => {
       <div className="relative mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl animate-fade-in">
-            Reduce Customer Service Costs by 
-            <span className="text-accent"> 70%</span>
+            AI Customer Service Agents for 
+            <span className="text-accent"> SMBs</span>
           </h1>
           <p className="mt-6 text-lg leading-8 text-white/90 animate-fade-in">
-            AI-powered customer service agents for small to medium businesses. 
-            Professional setup, maintenance, and continuous optimization for $300-1000/month.
+            Embed intelligent AI agents into your existing CRM, chat, and email systems. 
+            Deploy as widgets or subdomains. Reduce costs while improving customer satisfaction.
           </p>
           <div className="mt-10 flex items-center justify-center gap-x-6 animate-fade-in">
             <Button variant="hero" size="lg" className="text-lg px-8 py-4">
