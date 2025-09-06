@@ -19,10 +19,10 @@ const HeroSection = () => {
           </p>
           <div className="mt-10 flex items-center justify-center gap-x-6 animate-fade-in">
             <Button variant="hero" size="lg" className="text-lg px-8 py-4">
-              Get Started Today
+              <a href="/auth">Get Started Today</a>
             </Button>
             <Button variant="outline" size="lg" className="text-white border-white hover:bg-white/10 text-lg px-8 py-4">
-              View Demo
+              <a href="/dashboard">View Dashboard</a>
             </Button>
           </div>
         </div>
