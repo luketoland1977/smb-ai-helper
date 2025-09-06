@@ -10,6 +10,8 @@ const HeroSection = () => {
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl animate-fade-in">
             AI Customer Service Agents for 
             <span className="text-accent"> SMBs</span>
+            <br />
+            Save up to <span className="text-accent">70%</span> on Customer Service Costs
           </h1>
           <p className="mt-6 text-lg leading-8 text-white/90 animate-fade-in">
             Embed intelligent AI agents into your existing CRM, chat, and email systems. 
