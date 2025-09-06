@@ -1,0 +1,41 @@
+import { Button } from "@/components/ui/button";
+import heroImage from "@/assets/hero-image.jpg";
+
+const HeroSection = () => {
+  return (
+    <section className="relative overflow-hidden bg-gradient-hero">
+      <div className="absolute inset-0 bg-grid-white/10" />
+      <div className="relative mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl animate-fade-in">
+            Reduce Customer Service Costs by 
+            <span className="text-accent"> 70%</span>
+          </h1>
+          <p className="mt-6 text-lg leading-8 text-white/90 animate-fade-in">
+            AI-powered customer service agents for small to medium businesses. 
+            Professional setup, maintenance, and continuous optimization for $300-1000/month.
+          </p>
+          <div className="mt-10 flex items-center justify-center gap-x-6 animate-fade-in">
+            <Button variant="hero" size="lg" className="text-lg px-8 py-4">
+              Get Started Today
+            </Button>
+            <Button variant="outline" size="lg" className="text-white border-white hover:bg-white/10 text-lg px-8 py-4">
+              View Demo
+            </Button>
+          </div>
+        </div>
+        <div className="mt-16 flow-root sm:mt-24">
+          <div className="relative rounded-xl bg-white/5 p-2 ring-1 ring-white/10 lg:rounded-2xl lg:p-4">
+            <img
+              src={heroImage}
+              alt="AI Customer Service Dashboard"
+              className="rounded-md shadow-2xl ring-1 ring-white/10"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default HeroSection;
