@@ -121,17 +121,39 @@ serve(async (req) => {
         });
       }
 
-      // Find Twilio integration by phone number
+      // Find Twilio integration by phone number - handle different formats
+      console.log('Looking for Twilio integration with phone number:', to);
+      
+      // Try multiple phone number formats
+      const phoneFormats = [
+        to, // Original format
+        to.replace(/\D/g, ''), // Just digits
+        `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`, // +1 XXX XXX XXXX format
+        `+${to.slice(1, 2)} ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}` // +X XXX XXX XXXX format
+      ];
+      
+      console.log('Trying phone number formats:', phoneFormats);
+      
       const { data: twilioIntegration, error: twilioError } = await supabase
         .from('twilio_integrations')
         .select('*')
-        .eq('phone_number', to)
+        .in('phone_number', phoneFormats)
         .eq('is_active', true)
         .eq('voice_enabled', true)
         .single();
 
       if (twilioError || !twilioIntegration) {
-        console.error('No Twilio integration found for number:', to, twilioError);
+        console.error('No Twilio integration found for number:', to);
+        console.error('Database error:', twilioError);
+        console.error('Searched formats:', phoneFormats);
+        
+        // Let's also check what integrations exist
+        const { data: allIntegrations } = await supabase
+          .from('twilio_integrations')
+          .select('phone_number, is_active, voice_enabled')
+          .eq('is_active', true);
+        console.log('Available integrations:', allIntegrations);
+        
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say voice="alice">I'm sorry, our service is temporarily unavailable. Please try again later. Goodbye!</Say>
