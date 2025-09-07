@@ -108,21 +108,17 @@ serve(async (req) => {
         });
       }
 
-      // Find Twilio integration by phone number with associated agent
+      // Find Twilio integration by phone number
       const { data: twilioIntegration, error: twilioError } = await supabase
         .from('twilio_integrations')
-        .select(`
-          *,
-          clients!inner(*),
-          ai_agents!inner(*)
-        `)
+        .select('*')
         .eq('phone_number', to)
         .eq('is_active', true)
         .eq('voice_enabled', true)
         .single();
 
       if (twilioError || !twilioIntegration) {
-        console.error('No Twilio integration found for number:', to);
+        console.error('No Twilio integration found for number:', to, twilioError);
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say voice="alice">I'm sorry, our service is temporarily unavailable. Please try again later. Goodbye!</Say>
@@ -134,12 +130,17 @@ serve(async (req) => {
       }
 
       const clientId = twilioIntegration.client_id;
-      
-      // Use the agent associated with this phone number
-      const agent = twilioIntegration.ai_agents;
+      const agentId = twilioIntegration.agent_id;
 
-      if (!agent) {
-        console.error('No agent associated with this phone number:', to);
+      // Get the agent details separately
+      const { data: agent, error: agentError } = await supabase
+        .from('ai_agents')
+        .select('*')
+        .eq('id', agentId)
+        .single();
+
+      if (agentError || !agent) {
+        console.error('No agent found for ID:', agentId, agentError);
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say voice="alice">I'm sorry, no agent is configured for this number. Please contact support. Goodbye!</Say>
@@ -180,6 +181,7 @@ serve(async (req) => {
           .single();
 
         if (convError || !newConversation) {
+          console.error('Failed to create conversation:', convError);
           throw new Error('Failed to create conversation');
         }
         conversationId = newConversation.id;
@@ -198,6 +200,7 @@ serve(async (req) => {
       // Get OpenAI API key
       const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
       if (!openAIApiKey) {
+        console.error('OpenAI API key not configured');
         throw new Error('OpenAI API key not configured');
       }
 
