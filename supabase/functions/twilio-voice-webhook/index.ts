@@ -75,26 +75,23 @@ serve(async (req) => {
     console.log('Voice webhook called:', { action, from, to, callSid, speechResult });
 
     if (action === 'incoming') {
-      // Handle incoming call - use enhanced speech recognition with real-time model
-      const fullUrl = `https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-webhook?action=process`;
-      console.log('Setting gather action URL to:', fullUrl);
+      // Handle incoming call - start Media Stream for real-time voice
+      const streamUrl = `wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${callSid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      console.log('Setting up Media Stream for real-time voice:', streamUrl);
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">Hello! I'm your AI assistant with enhanced voice capabilities. How can I help you today?</Say>
-    <Gather 
-        input="speech" 
-        action="${fullUrl}"
-        method="POST"
-        speechTimeout="5"
-        speechModel="experimental_conversations"
-        enhanced="true">
-        <Say voice="alice">Please tell me what you need help with.</Say>
-    </Gather>
-    <Say voice="alice">I didn't hear anything. Please call back if you need assistance. Goodbye!</Say>
+    <Say voice="alice">Hello! Connecting you to our AI assistant with real-time voice capabilities.</Say>
+    <Connect>
+        <Stream url="${streamUrl}">
+            <Parameter name="callSid" value="${callSid}" />
+            <Parameter name="from" value="${from}" />
+            <Parameter name="to" value="${to}" />
+        </Stream>
+    </Connect>
 </Response>`;
 
-      console.log('Generated TwiML for incoming call with enhanced speech:', twiml);
+      console.log('Generated TwiML for real-time voice streaming:', twiml);
       return new Response(twiml, {
         headers: { 'Content-Type': 'text/xml' },
       });

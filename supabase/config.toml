@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.twilio-voice-webhook]
 verify_jwt = false
+
+[functions.twilio-realtime-voice]
+verify_jwt = false
