@@ -34,20 +34,25 @@ const Auth = () => {
         description: error.message,
         variant: "destructive",
       });
+    } else if (data.session) {
+      // User is immediately signed in (email confirmation disabled)
+      toast({
+        title: "Success",
+        description: "Account created successfully! Redirecting...",
+      });
+      navigate('/dashboard');
+    } else if (data.user && !data.session) {
+      // Email confirmation is enabled but appears disabled in settings
+      toast({
+        title: "Account Created",
+        description: "You can now sign in with your credentials. Email confirmation may need to be disabled in Supabase settings.",
+        variant: "default",
+      });
     } else {
-      // Check if user was immediately signed in (email confirmation disabled)
-      if (data.session) {
-        toast({
-          title: "Success",
-          description: "Account created successfully! Redirecting...",
-        });
-        navigate('/dashboard');
-      } else {
-        toast({
-          title: "Success",
-          description: "Check your email for confirmation link",
-        });
-      }
+      toast({
+        title: "Success", 
+        description: "Account created successfully!",
+      });
     }
     
     setLoading(false);
