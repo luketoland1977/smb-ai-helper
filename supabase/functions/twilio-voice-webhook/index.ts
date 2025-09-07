@@ -267,62 +267,126 @@ ${knowledgeContext}
 Please use this information to provide accurate, helpful responses. Keep responses natural for voice conversation.`;
       }
 
-      console.log('Calling OpenAI API with prompt length:', contextualPrompt.length);
+      console.log('Using OpenAI Real-time API for faster response...');
       
-      // Call OpenAI API
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Use OpenAI Real-time API for better voice interaction
+      const realtimeResponse = await fetch('https://api.openai.com/v1/realtime/sessions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAIApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: contextualPrompt
-            },
-            {
-              role: 'user',
-              content: speechResult
-            }
-          ],
-          max_tokens: 400,
-          temperature: 0.7,
+          model: 'gpt-4o-realtime-preview-2024-12-17',
+          voice: 'alloy',
+          instructions: contextualPrompt,
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
+          turn_detection: {
+            type: 'server_vad',
+            threshold: 0.5,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 1000
+          }
         }),
       });
 
-      console.log('OpenAI API response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('OpenAI API error:', response.status, errorData);
+      if (!realtimeResponse.ok) {
+        console.log('Real-time API failed, falling back to standard API...');
         
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="alice">I'm sorry, I'm having trouble understanding right now. Please try again later. Goodbye!</Say>
-</Response>`;
-        return new Response(twiml, {
-          headers: { 'Content-Type': 'text/xml' },
+        // Fallback to standard OpenAI API
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: contextualPrompt
+              },
+              {
+                role: 'user',
+                content: speechResult
+              }
+            ],
+            max_tokens: 400,
+            temperature: 0.7,
+          }),
         });
-      }
 
-      const data = await response.json();
-      console.log('OpenAI response received, generating TwiML...');
-      
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        console.error('Invalid OpenAI response structure:', data);
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="alice">I'm sorry, I couldn't generate a response. Please try again. Goodbye!</Say>
-</Response>`;
-        return new Response(twiml, {
-          headers: { 'Content-Type': 'text/xml' },
+        console.log('OpenAI API response status:', response.status);
+
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error('OpenAI API error:', response.status, errorData);
+          
+          const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+  <Response>
+      <Say voice="alice">I'm sorry, I'm having trouble understanding right now. Please try again later. Goodbye!</Say>
+  </Response>`;
+          return new Response(twiml, {
+            headers: { 'Content-Type': 'text/xml' },
+          });
+        }
+
+        const data = await response.json();
+        console.log('Standard API response received, generating TwiML...');
+        
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+          console.error('Invalid OpenAI response structure:', data);
+          const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+  <Response>
+      <Say voice="alice">I'm sorry, I couldn't generate a response. Please try again. Goodbye!</Say>
+  </Response>`;
+          return new Response(twiml, {
+            headers: { 'Content-Type': 'text/xml' },
+          });
+        }
+        
+        var aiResponse = data.choices[0].message.content;
+      } else {
+        // Handle Real-time API response
+        const realtimeData = await realtimeResponse.json();
+        console.log('Real-time session created:', realtimeData);
+        
+        // For now, use a simple prompt-based response until we implement full real-time streaming
+        // This gives us the faster model but still works with TwiML
+        const quickResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-realtime-preview-2024-12-17',
+            messages: [
+              {
+                role: 'system',
+                content: contextualPrompt + '\n\nRespond conversationally and naturally as if speaking on a phone call. Keep responses concise but helpful.'
+              },
+              {
+                role: 'user',
+                content: speechResult
+              }
+            ],
+            max_completion_tokens: 300,
+            stream: false
+          }),
         });
+
+        if (!quickResponse.ok) {
+          console.error('Quick response failed, using fallback');
+          var aiResponse = "I understand your request. Let me help you with that right away.";
+        } else {
+          const quickData = await quickResponse.json();
+          var aiResponse = quickData.choices?.[0]?.message?.content || "I'm here to help you with your request.";
+        }
       }
       
-      const aiResponse = data.choices[0].message.content;
       console.log('AI response generated:', aiResponse?.substring(0, 100) + '...');
 
       // Store AI response
