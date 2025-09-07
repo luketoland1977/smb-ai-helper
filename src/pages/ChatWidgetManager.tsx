@@ -40,6 +40,7 @@ const ChatWidgetManager = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [lastCreatedWidget, setLastCreatedWidget] = useState<any>(null);
   const [formData, setFormData] = useState({
     client_id: '',
     agent_id: '',
@@ -144,6 +145,15 @@ const ChatWidgetManager = () => {
       //   .select()
       //   .single();
 
+      // Store the created widget for display
+      setLastCreatedWidget({
+        client_id: formData.client_id,
+        agent_id: formData.agent_id,
+        widget_name: formData.widget_name,
+        config: config,
+        embed_code: embedCode
+      });
+
       toast({
         title: "Widget Created",
         description: "Your chat widget has been configured. Copy the embed code below.",
@@ -194,7 +204,10 @@ const ChatWidgetManager = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <h1 className="text-xl font-semibold text-foreground">Chat Widget Manager</h1>
-            <Button onClick={() => setShowCreateForm(true)}>
+            <Button onClick={() => {
+              setShowCreateForm(true);
+              setLastCreatedWidget(null);
+            }}>
               <MessageCircle className="h-4 w-4 mr-2" />
               Create Widget
             </Button>
@@ -325,11 +338,13 @@ const ChatWidgetManager = () => {
           </Card>
         )}
 
-        {/* Widget Preview and Embed Code */}
-        {formData.client_id && formData.agent_id && formData.widget_name && (
+        {/* Widget Preview and Embed Code - Show during creation or after creation */}
+        {((formData.client_id && formData.agent_id && formData.widget_name) || lastCreatedWidget) && (
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle>Widget Preview & Embed Code</CardTitle>
+              <CardTitle>
+                {lastCreatedWidget ? `Widget "${lastCreatedWidget.widget_name}" - Embed Code` : 'Widget Preview & Embed Code'}
+              </CardTitle>
               <CardDescription>
                 Copy this code and paste it into your website's HTML
               </CardDescription>
@@ -342,24 +357,30 @@ const ChatWidgetManager = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => copyToClipboard(generateEmbedCode(formData.client_id, formData.agent_id, {
-                        primaryColor: formData.primary_color,
-                        welcomeMessage: formData.welcome_message,
-                        position: formData.position,
-                        size: formData.size
-                      }))}
+                      onClick={() => copyToClipboard(lastCreatedWidget 
+                        ? lastCreatedWidget.embed_code 
+                        : generateEmbedCode(formData.client_id, formData.agent_id, {
+                          primaryColor: formData.primary_color,
+                          welcomeMessage: formData.welcome_message,
+                          position: formData.position,
+                          size: formData.size
+                        })
+                      )}
                     >
                       <Copy className="h-4 w-4 mr-1" />
                       Copy
                     </Button>
                   </div>
                   <pre className="text-xs bg-background p-3 rounded border overflow-x-auto">
-                    {generateEmbedCode(formData.client_id, formData.agent_id, {
-                      primaryColor: formData.primary_color,
-                      welcomeMessage: formData.welcome_message,
-                      position: formData.position,
-                      size: formData.size
-                    })}
+                    {lastCreatedWidget 
+                      ? lastCreatedWidget.embed_code 
+                      : generateEmbedCode(formData.client_id, formData.agent_id, {
+                        primaryColor: formData.primary_color,
+                        welcomeMessage: formData.welcome_message,
+                        position: formData.position,
+                        size: formData.size
+                      })
+                    }
                   </pre>
                 </div>
 
