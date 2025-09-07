@@ -75,147 +75,29 @@ serve(async (req) => {
     console.log('Voice webhook called:', { action, from, to, callSid, speechResult });
 
     if (action === 'incoming') {
-      // Handle incoming call with Media Streams for real-time voice
-      const streamUrl = `wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-webhook?action=stream`;
-      console.log('Setting up Media Stream for real-time voice:', streamUrl);
+      // Handle incoming call - use enhanced speech recognition with real-time model
+      const fullUrl = `https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-webhook?action=process`;
+      console.log('Setting gather action URL to:', fullUrl);
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">Hello! Connecting you to our AI assistant with real-time voice.</Say>
-    <Connect>
-        <Stream url="${streamUrl}">
-            <Parameter name="callSid" value="${callSid}" />
-            <Parameter name="from" value="${from}" />
-            <Parameter name="to" value="${to}" />
-        </Stream>
-    </Connect>
+    <Say voice="alice">Hello! I'm your AI assistant with enhanced voice capabilities. How can I help you today?</Say>
+    <Gather 
+        input="speech" 
+        action="${fullUrl}"
+        method="POST"
+        speechTimeout="5"
+        speechModel="experimental_conversations"
+        enhanced="true">
+        <Say voice="alice">Please tell me what you need help with.</Say>
+    </Gather>
+    <Say voice="alice">I didn't hear anything. Please call back if you need assistance. Goodbye!</Say>
 </Response>`;
 
-      console.log('Generated TwiML for real-time voice streaming:', twiml);
+      console.log('Generated TwiML for incoming call with enhanced speech:', twiml);
       return new Response(twiml, {
         headers: { 'Content-Type': 'text/xml' },
       });
-    }
-
-    if (action === 'stream') {
-      // Handle WebSocket connection for real-time voice streaming
-      const upgrade = req.headers.get('upgrade');
-      if (upgrade !== 'websocket') {
-        return new Response('Expected websocket', { status: 400 });
-      }
-
-      const { socket, response } = Deno.upgradeWebSocket(req);
-
-      // WebSocket connection established - set up OpenAI real-time API connection
-      let openAIWS: WebSocket | null = null;
-      let isConnected = false;
-
-      socket.onopen = async () => {
-        console.log('Twilio Media Stream WebSocket connected');
-        
-        // Connect to OpenAI Realtime API
-        try {
-          const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-          if (!openAIApiKey) {
-            console.error('OpenAI API key not configured');
-            socket.close();
-            return;
-          }
-
-          // Create ephemeral token for OpenAI Realtime API
-          const tokenResponse = await fetch('https://api.openai.com/v1/realtime/sessions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${openAIApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-realtime-preview-2024-12-17',
-              voice: 'alloy',
-              instructions: 'You are a helpful AI assistant. Keep responses conversational and natural for voice calls.'
-            }),
-          });
-
-          const tokenData = await tokenResponse.json();
-          console.log('✅ USING REAL-TIME VOICE API WITH TWILIO MEDIA STREAMS');
-          
-          // Connect to OpenAI with ephemeral token
-          openAIWS = new WebSocket(
-            `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`,
-            {
-              headers: {
-                'Authorization': `Bearer ${tokenData.client_secret.value}`,
-                'OpenAI-Beta': 'realtime=v1'
-              }
-            }
-          );
-
-          openAIWS.onopen = () => {
-            console.log('Connected to OpenAI Realtime API');
-            isConnected = true;
-            
-            // Configure session for phone call audio
-            openAIWS?.send(JSON.stringify({
-              type: 'session.update',
-              session: {
-                modalities: ['audio'],
-                instructions: 'You are a helpful AI assistant on a phone call. Keep responses conversational and natural.',
-                voice: 'alloy',
-                input_audio_format: 'pcm16',
-                output_audio_format: 'pcm16',
-                turn_detection: {
-                  type: 'server_vad',
-                  threshold: 0.5,
-                  prefix_padding_ms: 300,
-                  silence_duration_ms: 1000
-                }
-              }
-            }));
-          };
-
-          openAIWS.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            
-            if (data.type === 'response.audio.delta') {
-              // Forward audio to Twilio
-              socket.send(JSON.stringify({
-                event: 'media',
-                streamSid: 'stream-sid',
-                media: {
-                  payload: data.delta
-                }
-              }));
-            }
-          };
-
-          openAIWS.onerror = (error) => {
-            console.error('OpenAI WebSocket error:', error);
-          };
-
-        } catch (error) {
-          console.error('Error connecting to OpenAI:', error);
-          socket.close();
-        }
-      };
-
-      socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.event === 'media' && openAIWS && isConnected) {
-          // Forward audio from Twilio to OpenAI
-          openAIWS.send(JSON.stringify({
-            type: 'input_audio_buffer.append',
-            audio: data.media.payload
-          }));
-        }
-      };
-
-      socket.onclose = () => {
-        console.log('Twilio Media Stream disconnected');
-        openAIWS?.close();
-      };
-
-      return response;
     }
 
     if (action === 'process') {
@@ -390,7 +272,7 @@ Please use this information to provide accurate, helpful responses. Keep respons
       console.log('OpenAI API Key available:', !!openAIApiKey);
       console.log('Speech result received:', speechResult);
       
-      // Use the real-time model directly through chat completions for TwiML compatibility
+      // Use OpenAI chat completions with voice-optimized model
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -398,20 +280,21 @@ Please use this information to provide accurate, helpful responses. Keep respons
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-mini-2025-08-07',
+          model: 'gpt-4o',
           messages: [
             {
               role: 'system',
-              content: contextualPrompt + '\n\nRespond conversationally and naturally as if speaking on a phone call. Keep responses concise but helpful.'
+              content: contextualPrompt + '\n\nIMPORTANT: You are on a phone call. Respond naturally and conversationally as if speaking directly to the caller. Keep responses concise but helpful, and speak in a way that sounds natural when converted to speech.'
             },
             {
               role: 'user',
               content: speechResult
             }
           ],
-          max_completion_tokens: 300,
-          stream: false
+          max_tokens: 300,
+          temperature: 0.8,
         }),
+      });
       });
 
       console.log('Real-time model API response status:', response.status);
@@ -429,7 +312,7 @@ Please use this information to provide accurate, helpful responses. Keep respons
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-5-nano-2025-08-07',
+            model: 'gpt-4o-mini',
             messages: [
               {
                 role: 'system',
