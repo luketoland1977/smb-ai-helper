@@ -210,8 +210,16 @@ serve(async (req) => {
       const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
       if (!openAIApiKey) {
         console.error('OpenAI API key not configured');
-        throw new Error('OpenAI API key not configured');
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice">I'm sorry, my AI service is not configured. Please contact support. Goodbye!</Say>
+</Response>`;
+        return new Response(twiml, {
+          headers: { 'Content-Type': 'text/xml' },
+        });
       }
+
+      console.log('OpenAI API key found, generating response...');
 
       // Build contextual prompt with knowledge base integration
       let contextualPrompt = agent.system_prompt || `You are a helpful AI customer service agent. You assist customers with their inquiries in a friendly and professional manner via phone calls.
@@ -233,6 +241,8 @@ ${knowledgeContext}
 Please use this information to provide accurate, helpful responses. Keep responses natural for voice conversation.`;
       }
 
+      console.log('Calling OpenAI API with prompt length:', contextualPrompt.length);
+      
       // Call OpenAI API
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -257,14 +267,37 @@ Please use this information to provide accurate, helpful responses. Keep respons
         }),
       });
 
+      console.log('OpenAI API response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.text();
         console.error('OpenAI API error:', response.status, errorData);
-        throw new Error(`OpenAI API error: ${response.status}`);
+        
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice">I'm sorry, I'm having trouble understanding right now. Please try again later. Goodbye!</Say>
+</Response>`;
+        return new Response(twiml, {
+          headers: { 'Content-Type': 'text/xml' },
+        });
       }
 
       const data = await response.json();
+      console.log('OpenAI response received, generating TwiML...');
+      
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        console.error('Invalid OpenAI response structure:', data);
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice">I'm sorry, I couldn't generate a response. Please try again. Goodbye!</Say>
+</Response>`;
+        return new Response(twiml, {
+          headers: { 'Content-Type': 'text/xml' },
+        });
+      }
+      
       const aiResponse = data.choices[0].message.content;
+      console.log('AI response generated:', aiResponse?.substring(0, 100) + '...');
 
       // Store AI response
       await supabase
@@ -279,11 +312,23 @@ Please use this information to provide accurate, helpful responses. Keep respons
       // Get voice settings
       const voiceSettings = twilioIntegration.voice_settings || { voice: 'alice', language: 'en-US' };
       const voice = voiceSettings.voice || 'alice';
+      
+      console.log('Using voice settings:', voiceSettings);
+
+      // Escape XML characters in AI response
+      const escapedResponse = aiResponse
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+
+      console.log('Creating TwiML response with voice:', voice);
 
       // Create TwiML response with AI message and continue conversation
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="${voice}">${aiResponse}</Say>
+    <Say voice="${voice}">${escapedResponse}</Say>
     <Gather 
         input="speech" 
         action="${url.origin}${url.pathname}?action=process"
@@ -295,6 +340,7 @@ Please use this information to provide accurate, helpful responses. Keep respons
     <Say voice="${voice}">Thank you for calling. Have a great day! Goodbye!</Say>
 </Response>`;
 
+      console.log('TwiML generated successfully, sending response');
       console.log('Voice conversation processed successfully');
 
       return new Response(twiml, {
