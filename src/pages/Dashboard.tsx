@@ -110,6 +110,9 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-muted-foreground">{user?.email}</span>
+              <Button variant="outline" onClick={() => navigate('/widgets')}>
+                Chat Widgets
+              </Button>
               <Button variant="outline" onClick={handleSignOut}>
                 Sign Out
               </Button>
@@ -186,9 +189,14 @@ const Dashboard = () => {
                         <h3 className="font-medium">{client.name}</h3>
                         <p className="text-sm text-muted-foreground">{client.domain}</p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => navigate(`/clients/${client.id}`)}>
-                        Manage
-                      </Button>
+                      <div className="flex space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/clients/${client.id}/knowledge-base`)}>
+                          Knowledge Base
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/clients/${client.id}`)}>
+                          Manage
+                        </Button>
+                      </div>
                     </div>
                   ))}
                   {clients.length > 3 && (
