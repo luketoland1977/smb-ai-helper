@@ -394,8 +394,8 @@
     showTyping();
 
     try {
-      console.log('AI Widget: Making fetch request to:', `${config.apiUrl}/functions/v1/widget-chat`);
-      const response = await fetch(`${config.apiUrl}/functions/v1/widget-chat`, {
+      console.log('AI Widget: Making fetch request to:', `https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/widget-chat`);
+      const response = await fetch(`https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/widget-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
