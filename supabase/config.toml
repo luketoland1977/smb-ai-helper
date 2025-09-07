@@ -1,1 +1,7 @@
 project_id = "ycvvuepfsebqpwmamqgg"
+
+[functions.chat-with-agent]
+verify_jwt = false
+
+[functions.widget-chat]
+verify_jwt = false
