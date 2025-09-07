@@ -267,10 +267,10 @@ ${knowledgeContext}
 Please use this information to provide accurate, helpful responses. Keep responses natural for voice conversation.`;
       }
 
-      console.log('Using OpenAI Real-time API for faster response...');
+      console.log('Using OpenAI Real-time model for voice response...');
       
-      // Use OpenAI Real-time API for better voice interaction
-      const realtimeResponse = await fetch('https://api.openai.com/v1/realtime/sessions', {
+      // Use the real-time model directly through chat completions for TwiML compatibility
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAIApiKey}`,
@@ -278,24 +278,30 @@ Please use this information to provide accurate, helpful responses. Keep respons
         },
         body: JSON.stringify({
           model: 'gpt-4o-realtime-preview-2024-12-17',
-          voice: 'alloy',
-          instructions: contextualPrompt,
-          input_audio_format: 'pcm16',
-          output_audio_format: 'pcm16',
-          turn_detection: {
-            type: 'server_vad',
-            threshold: 0.5,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 1000
-          }
+          messages: [
+            {
+              role: 'system',
+              content: contextualPrompt + '\n\nRespond conversationally and naturally as if speaking on a phone call. Keep responses concise but helpful.'
+            },
+            {
+              role: 'user',
+              content: speechResult
+            }
+          ],
+          max_completion_tokens: 300,
+          stream: false
         }),
       });
 
-      if (!realtimeResponse.ok) {
-        console.log('Real-time API failed, falling back to standard API...');
+      console.log('Real-time model API response status:', response.status);
+
+      if (!response.ok) {
+        console.log('Real-time model failed, falling back to standard API...');
+        const errorData = await response.text();
+        console.error('Real-time model error:', response.status, errorData);
         
         // Fallback to standard OpenAI API
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const fallbackResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${openAIApiKey}`,
@@ -318,11 +324,9 @@ Please use this information to provide accurate, helpful responses. Keep respons
           }),
         });
 
-        console.log('OpenAI API response status:', response.status);
-
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error('OpenAI API error:', response.status, errorData);
+        if (!fallbackResponse.ok) {
+          const fallbackErrorData = await fallbackResponse.text();
+          console.error('Fallback API error:', fallbackResponse.status, fallbackErrorData);
           
           const twiml = `<?xml version="1.0" encoding="UTF-8"?>
   <Response>
@@ -333,57 +337,19 @@ Please use this information to provide accurate, helpful responses. Keep respons
           });
         }
 
+        const fallbackData = await fallbackResponse.json();
+        var aiResponse = fallbackData.choices?.[0]?.message?.content || "I'm here to help you with your request.";
+        console.log('Fallback API response used');
+      } else {
         const data = await response.json();
-        console.log('Standard API response received, generating TwiML...');
+        console.log('Real-time model response received successfully');
         
         if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-          console.error('Invalid OpenAI response structure:', data);
-          const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-  <Response>
-      <Say voice="alice">I'm sorry, I couldn't generate a response. Please try again. Goodbye!</Say>
-  </Response>`;
-          return new Response(twiml, {
-            headers: { 'Content-Type': 'text/xml' },
-          });
-        }
-        
-        var aiResponse = data.choices[0].message.content;
-      } else {
-        // Handle Real-time API response
-        const realtimeData = await realtimeResponse.json();
-        console.log('Real-time session created:', realtimeData);
-        
-        // For now, use a simple prompt-based response until we implement full real-time streaming
-        // This gives us the faster model but still works with TwiML
-        const quickResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-realtime-preview-2024-12-17',
-            messages: [
-              {
-                role: 'system',
-                content: contextualPrompt + '\n\nRespond conversationally and naturally as if speaking on a phone call. Keep responses concise but helpful.'
-              },
-              {
-                role: 'user',
-                content: speechResult
-              }
-            ],
-            max_completion_tokens: 300,
-            stream: false
-          }),
-        });
-
-        if (!quickResponse.ok) {
-          console.error('Quick response failed, using fallback');
-          var aiResponse = "I understand your request. Let me help you with that right away.";
+          console.error('Invalid real-time model response structure:', data);
+          var aiResponse = "I'm here to help you with your request.";
         } else {
-          const quickData = await quickResponse.json();
-          var aiResponse = quickData.choices?.[0]?.message?.content || "I'm here to help you with your request.";
+          var aiResponse = data.choices[0].message.content;
+          console.log('Using real-time model response');
         }
       }
       
