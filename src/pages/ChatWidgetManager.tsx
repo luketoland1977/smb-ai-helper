@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Copy, ExternalLink, Settings, MessageCircle, Phone, MessageSquare } from 'lucide-react';
+import VoiceInterface from '@/components/VoiceInterface';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -327,7 +328,7 @@ const ChatWidgetManager = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="widgets" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="widgets">
               <MessageCircle className="h-4 w-4 mr-2" />
               Chat Widgets
@@ -335,6 +336,10 @@ const ChatWidgetManager = () => {
             <TabsTrigger value="phone">
               <Phone className="h-4 w-4 mr-2" />
               Phone Integration
+            </TabsTrigger>
+            <TabsTrigger value="realtime">
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Real-time Voice
             </TabsTrigger>
           </TabsList>
 
@@ -782,6 +787,36 @@ const ChatWidgetManager = () => {
                 ))
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="realtime" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>OpenAI Real-time Voice Interface</CardTitle>
+                <CardDescription>
+                  Test the new real-time voice AI that's much faster and more natural than traditional phone calls.
+                  This uses OpenAI's WebRTC-based real-time API for instant conversation.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-w-md mx-auto">
+                  <VoiceInterface 
+                    agentId={agents.length > 0 ? agents[0].id : undefined}
+                    onSpeakingChange={(speaking) => console.log('Speaking:', speaking)}
+                  />
+                </div>
+                <div className="mt-6 space-y-3 text-sm text-muted-foreground">
+                  <p><strong>Benefits over traditional phone calls:</strong></p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Near-instant response times (under 300ms)</li>
+                    <li>More natural conversation flow</li>
+                    <li>Better voice quality and clarity</li>
+                    <li>No phone charges or Twilio costs</li>
+                    <li>Works directly in the browser</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
