@@ -423,7 +423,7 @@ const ChatWidgetManager = () => {
                       `}
                       className="w-full h-full border-0"
                       title="Widget Preview"
-                      sandbox="allow-scripts allow-same-origin"
+                      sandbox="allow-scripts allow-same-origin allow-forms"
                     />
                   </div>
                 </div>
