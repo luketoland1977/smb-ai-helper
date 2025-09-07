@@ -384,6 +384,50 @@ const ChatWidgetManager = () => {
                   </pre>
                 </div>
 
+                {/* Live Widget Preview */}
+                <div className="p-4 bg-muted rounded-lg">
+                  <h4 className="font-medium mb-2">Live Preview</h4>
+                  <div className="relative h-64 bg-white rounded border overflow-hidden">
+                    <iframe
+                      srcDoc={`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                          <meta charset="UTF-8">
+                          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                          <title>Widget Preview</title>
+                          <style>
+                            body { 
+                              margin: 0; 
+                              padding: 20px; 
+                              background: #f0f0f0; 
+                              font-family: Arial, sans-serif;
+                            }
+                          </style>
+                        </head>
+                        <body>
+                          <h3>Your website content here...</h3>
+                          <p>This is a preview of how the chat widget will appear on your website. Click the chat button to test it!</p>
+                          
+                          ${lastCreatedWidget 
+                            ? lastCreatedWidget.embed_code 
+                            : generateEmbedCode(formData.client_id, formData.agent_id, {
+                              primaryColor: formData.primary_color,
+                              welcomeMessage: formData.welcome_message,
+                              position: formData.position,
+                              size: formData.size
+                            })
+                          }
+                        </body>
+                        </html>
+                      `}
+                      className="w-full h-full border-0"
+                      title="Widget Preview"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                  </div>
+                </div>
+
                 <div className="p-4 bg-muted rounded-lg">
                   <h4 className="font-medium mb-2">Integration Instructions</h4>
                   <ol className="text-sm space-y-1 list-decimal list-inside">
