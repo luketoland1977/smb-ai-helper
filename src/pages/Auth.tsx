@@ -24,6 +24,10 @@ const Auth = () => {
       password,
     });
 
+    console.log('Signup response:', { data, error });
+    console.log('Session exists:', !!data.session);
+    console.log('User exists:', !!data.user);
+
     if (error) {
       toast({
         title: "Error",
