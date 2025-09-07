@@ -295,7 +295,6 @@ Please use this information to provide accurate, helpful responses. Keep respons
           temperature: 0.8,
         }),
       });
-      });
 
       console.log('Real-time model API response status:', response.status);
 
