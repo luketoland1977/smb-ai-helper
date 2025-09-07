@@ -20,8 +20,8 @@ interface Document {
   file_path: string;
   processed: boolean;
   created_at: string;
-  source_type?: 'file' | 'url';
-  source_url?: string;
+  source_type: 'file' | 'url';
+  source_url: string | null;
 }
 
 interface Client {
@@ -87,7 +87,7 @@ const KnowledgeBase = () => {
         variant: "destructive",
       });
     } else {
-      setDocuments(data || []);
+      setDocuments((data as Document[]) || []);
     }
     setLoading(false);
   };

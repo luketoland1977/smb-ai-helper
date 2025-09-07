@@ -1,0 +1,317 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Search knowledge base for relevant content
+async function searchKnowledgeBase(clientId: string, query: string): Promise<string | null> {
+  try {
+    console.log('Searching knowledge base for client:', clientId, 'query:', query);
+    
+    const { data: chunks, error } = await supabase
+      .from('knowledge_base_chunks')
+      .select('content, metadata')
+      .eq('client_id', clientId)
+      .textSearch('content', query.split(' ').join(' | '))
+      .limit(3);
+
+    if (error) {
+      console.error('Knowledge base search error:', error);
+      return null;
+    }
+
+    if (!chunks || chunks.length === 0) {
+      console.log('No relevant knowledge base content found');
+      return null;
+    }
+
+    const context = chunks
+      .map(chunk => chunk.content)
+      .join('\n\n---\n\n');
+
+    console.log('Found relevant knowledge base content:', chunks.length, 'chunks');
+    return context;
+  } catch (error) {
+    console.error('Error searching knowledge base:', error);
+    return null;
+  }
+}
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const url = new URL(req.url);
+    const action = url.searchParams.get('action') || 'incoming';
+
+    // Parse form data from Twilio webhook
+    const formData = await req.formData();
+    const from = formData.get('From') as string;
+    const to = formData.get('To') as string;
+    const callSid = formData.get('CallSid') as string;
+    const speechResult = formData.get('SpeechResult') as string;
+
+    console.log('Voice webhook called:', { action, from, to, callSid, speechResult });
+
+    if (action === 'incoming') {
+      // Handle incoming call - return initial greeting with speech recognition
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice">Hello! I'm your AI assistant. How can I help you today?</Say>
+    <Gather 
+        input="speech" 
+        action="${url.origin}${url.pathname}?action=process"
+        method="POST"
+        speechTimeout="3"
+        speechModel="experimental_conversations">
+        <Say voice="alice">Please tell me what you need help with.</Say>
+    </Gather>
+    <Say voice="alice">I didn't hear anything. Please call back if you need assistance. Goodbye!</Say>
+</Response>`;
+
+      return new Response(twiml, {
+        headers: { 'Content-Type': 'text/xml' },
+      });
+    }
+
+    if (action === 'process') {
+      // Process speech and generate AI response
+      if (!speechResult) {
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice">I'm sorry, I didn't understand what you said. Please try again.</Say>
+    <Gather 
+        input="speech" 
+        action="${url.origin}${url.pathname}?action=process"
+        method="POST"
+        speechTimeout="3"
+        speechModel="experimental_conversations">
+        <Say voice="alice">How can I help you?</Say>
+    </Gather>
+    <Say voice="alice">Goodbye!</Say>
+</Response>`;
+
+        return new Response(twiml, {
+          headers: { 'Content-Type': 'text/xml' },
+        });
+      }
+
+      // Find Twilio integration by phone number
+      const { data: twilioIntegration, error: twilioError } = await supabase
+        .from('twilio_integrations')
+        .select('*, clients!inner(*)')
+        .eq('phone_number', to)
+        .eq('is_active', true)
+        .eq('voice_enabled', true)
+        .single();
+
+      if (twilioError || !twilioIntegration) {
+        console.error('No Twilio integration found for number:', to);
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice">I'm sorry, our service is temporarily unavailable. Please try again later. Goodbye!</Say>
+</Response>`;
+
+        return new Response(twiml, {
+          headers: { 'Content-Type': 'text/xml' },
+        });
+      }
+
+      const clientId = twilioIntegration.client_id;
+      
+      // Get the first active agent for this client
+      const { data: agent, error: agentError } = await supabase
+        .from('ai_agents')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('status', 'active')
+        .limit(1)
+        .single();
+
+      if (agentError || !agent) {
+        console.error('No active agent found for client:', clientId);
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice">I'm sorry, our service is temporarily unavailable. Please try again later. Goodbye!</Say>
+</Response>`;
+
+        return new Response(twiml, {
+          headers: { 'Content-Type': 'text/xml' },
+        });
+      }
+
+      // Check for existing conversation or create new one
+      let conversationId: string;
+      const { data: existingConversation } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('phone_number', from)
+        .eq('communication_channel', 'voice')
+        .eq('twilio_session_id', callSid)
+        .single();
+
+      if (existingConversation) {
+        conversationId = existingConversation.id;
+      } else {
+        // Create new conversation
+        const { data: newConversation, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            client_id: clientId,
+            agent_id: agent.id,
+            communication_channel: 'voice',
+            phone_number: from,
+            twilio_session_id: callSid,
+            status: 'active',
+            metadata: { call_sid: callSid }
+          })
+          .select('id')
+          .single();
+
+        if (convError || !newConversation) {
+          throw new Error('Failed to create conversation');
+        }
+        conversationId = newConversation.id;
+      }
+
+      // Store user message
+      await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          role: 'user',
+          content: speechResult,
+          metadata: { call_sid: callSid, phone_number: from }
+        });
+
+      // Get OpenAI API key
+      const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+      if (!openAIApiKey) {
+        throw new Error('OpenAI API key not configured');
+      }
+
+      // Build contextual prompt with knowledge base integration
+      let contextualPrompt = agent.system_prompt || `You are a helpful AI customer service agent. You assist customers with their inquiries in a friendly and professional manner via phone calls.
+
+Guidelines:
+- Keep responses conversational and natural for voice
+- Be polite and helpful
+- Provide accurate information based on the knowledge base when available
+- Ask clarifying questions when needed
+- Speak clearly and at a moderate pace
+- If the conversation seems complete, offer to help with anything else or say goodbye`;
+
+      // Search knowledge base for relevant context
+      const knowledgeContext = await searchKnowledgeBase(clientId, speechResult);
+      if (knowledgeContext) {
+        contextualPrompt += `\n\nRelevant information from knowledge base:
+${knowledgeContext}
+
+Please use this information to provide accurate, helpful responses. Keep responses natural for voice conversation.`;
+      }
+
+      // Call OpenAI API
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: contextualPrompt
+            },
+            {
+              role: 'user',
+              content: speechResult
+            }
+          ],
+          max_tokens: 400,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('OpenAI API error:', response.status, errorData);
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const aiResponse = data.choices[0].message.content;
+
+      // Store AI response
+      await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          role: 'assistant',
+          content: aiResponse,
+          metadata: { channel: 'voice', call_sid: callSid }
+        });
+
+      // Get voice settings
+      const voiceSettings = twilioIntegration.voice_settings || { voice: 'alice', language: 'en-US' };
+      const voice = voiceSettings.voice || 'alice';
+
+      // Create TwiML response with AI message and continue conversation
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="${voice}">${aiResponse}</Say>
+    <Gather 
+        input="speech" 
+        action="${url.origin}${url.pathname}?action=process"
+        method="POST"
+        speechTimeout="5"
+        speechModel="experimental_conversations">
+        <Say voice="${voice}">Is there anything else I can help you with?</Say>
+    </Gather>
+    <Say voice="${voice}">Thank you for calling. Have a great day! Goodbye!</Say>
+</Response>`;
+
+      console.log('Voice conversation processed successfully');
+
+      return new Response(twiml, {
+        headers: { 'Content-Type': 'text/xml' },
+      });
+    }
+
+    // Default response for unknown actions
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice">I'm sorry, there was an error processing your call. Please try again later. Goodbye!</Say>
+</Response>`;
+
+    return new Response(twiml, {
+      headers: { 'Content-Type': 'text/xml' },
+    });
+
+  } catch (error) {
+    console.error('Error in voice webhook:', error);
+    
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice">I'm sorry, I'm experiencing technical difficulties. Please try again later. Goodbye!</Say>
+</Response>`;
+
+    return new Response(twiml, {
+      headers: { 'Content-Type': 'text/xml' },
+    });
+  }
+});

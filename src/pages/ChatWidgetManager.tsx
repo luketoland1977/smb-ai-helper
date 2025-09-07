@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { Copy, ExternalLink, Settings, MessageCircle } from 'lucide-react';
+import { Copy, ExternalLink, Settings, MessageCircle, Phone, MessageSquare } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,19 @@ interface ChatWidget {
   embed_code: string;
   is_active: boolean;
   created_at: string;
+}
+
+interface TwilioIntegration {
+  id: string;
+  client_id: string;
+  account_sid: string;
+  phone_number: string;
+  is_active: boolean;
+  sms_enabled: boolean;
+  voice_enabled: boolean;
+  voice_settings: any;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Agent {
@@ -38,8 +52,10 @@ const ChatWidgetManager = () => {
   const [widgets, setWidgets] = useState<ChatWidget[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [twilioIntegrations, setTwilioIntegrations] = useState<TwilioIntegration[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showTwilioForm, setShowTwilioForm] = useState(false);
   const [lastCreatedWidget, setLastCreatedWidget] = useState<any>(null);
   const [formData, setFormData] = useState({
     client_id: '',
@@ -48,7 +64,18 @@ const ChatWidgetManager = () => {
     primary_color: '#2563eb',
     welcome_message: 'Hello! How can I help you today?',
     position: 'bottom-right',
-    size: 'medium'
+    size: 'medium',
+  });
+
+  const [twilioFormData, setTwilioFormData] = useState({
+    client_id: '',
+    account_sid: '',
+    auth_token: '',
+    phone_number: '',
+    sms_enabled: true,
+    voice_enabled: true,
+    voice: 'alice',
+    language: 'en-US',
   });
 
   useEffect(() => {
@@ -74,12 +101,19 @@ const ChatWidgetManager = () => {
 
       if (agentsData) setAgents(agentsData);
 
-      // TODO: Load existing widgets once types are regenerated
-      // const { data: widgetsData } = await supabase
-      //   .from('chat_widgets')
-      //   .select('*')
-      //   .order('created_at', { ascending: false });
-      // if (widgetsData) setWidgets(widgetsData);
+      // Load existing widgets
+      const { data: widgetsData } = await supabase
+        .from('chat_widgets')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (widgetsData) setWidgets(widgetsData);
+
+      // Load Twilio integrations
+      const { data: twilioData } = await supabase
+        .from('twilio_integrations')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (twilioData) setTwilioIntegrations(twilioData);
       
     } catch (error) {
       console.error('Error loading data:', error);
@@ -190,6 +224,55 @@ const ChatWidgetManager = () => {
     });
   };
 
+  const createTwilioIntegration = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('twilio_integrations')
+        .insert({
+          client_id: twilioFormData.client_id,
+          account_sid: twilioFormData.account_sid,
+          phone_number: twilioFormData.phone_number,
+          sms_enabled: twilioFormData.sms_enabled,
+          voice_enabled: twilioFormData.voice_enabled,
+          voice_settings: {
+            voice: twilioFormData.voice,
+            language: twilioFormData.language
+          }
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Twilio Integration Created",
+        description: `Phone integration configured for ${twilioFormData.phone_number}`,
+      });
+
+      // Refresh data
+      loadData();
+      setShowTwilioForm(false);
+      setTwilioFormData({
+        client_id: '',
+        account_sid: '',
+        auth_token: '',
+        phone_number: '',
+        sms_enabled: true,
+        voice_enabled: true,
+        voice: 'alice',
+        language: 'en-US',
+      });
+
+    } catch (error) {
+      console.error('Error creating Twilio integration:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create Twilio integration",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -204,18 +287,37 @@ const ChatWidgetManager = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <h1 className="text-xl font-semibold text-foreground">Chat Widget Manager</h1>
-            <Button onClick={() => {
-              setShowCreateForm(true);
-              setLastCreatedWidget(null);
-            }}>
-              <MessageCircle className="h-4 w-4 mr-2" />
-              Create Widget
-            </Button>
+            <div className="flex space-x-3">
+              <Button onClick={() => {
+                setShowCreateForm(true);
+                setLastCreatedWidget(null);
+              }}>
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Create Widget
+              </Button>
+              <Button variant="outline" onClick={() => setShowTwilioForm(true)}>
+                <Phone className="h-4 w-4 mr-2" />
+                Add Phone Integration
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Tabs defaultValue="widgets" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="widgets">
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Chat Widgets
+            </TabsTrigger>
+            <TabsTrigger value="phone">
+              <Phone className="h-4 w-4 mr-2" />
+              Phone Integration
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="widgets" className="space-y-6">
         {showCreateForm && (
           <Card className="mb-8">
             <CardHeader>
@@ -487,9 +589,159 @@ const ChatWidgetManager = () => {
                   </p>
                 </div>
               </div>
+             </div>
+           </CardContent>
+         </Card>
+
+          </TabsContent>
+
+          <TabsContent value="phone" className="space-y-6">
+            {showTwilioForm && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Configure Phone Integration</CardTitle>
+                  <CardDescription>
+                    Set up Twilio integration for SMS and voice calls
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="twilio-client">Client *</Label>
+                      <select
+                        id="twilio-client"
+                        value={twilioFormData.client_id}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, client_id: e.target.value })}
+                        className="w-full p-2 border border-border rounded-md bg-background"
+                        required
+                      >
+                        <option value="">Select a client</option>
+                        {clients.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phone-number">Phone Number *</Label>
+                      <Input
+                        id="phone-number"
+                        value={twilioFormData.phone_number}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, phone_number: e.target.value })}
+                        placeholder="+1234567890"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="account-sid">Twilio Account SID *</Label>
+                      <Input
+                        id="account-sid"
+                        value={twilioFormData.account_sid}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, account_sid: e.target.value })}
+                        placeholder="AC..."
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="auth-token">Auth Token *</Label>
+                      <Input
+                        id="auth-token"
+                        type="password"
+                        value={twilioFormData.auth_token}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, auth_token: e.target.value })}
+                        placeholder="Your Twilio Auth Token"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={twilioFormData.sms_enabled}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, sms_enabled: e.target.checked })}
+                      />
+                      <span>Enable SMS</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={twilioFormData.voice_enabled}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, voice_enabled: e.target.checked })}
+                      />
+                      <span>Enable Voice Calls</span>
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end space-x-3">
+                    <Button variant="outline" onClick={() => setShowTwilioForm(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={createTwilioIntegration}>
+                      Create Integration
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="grid gap-6">
+              <h3 className="text-lg font-semibold">Existing Phone Integrations</h3>
+              {twilioIntegrations.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-center text-muted-foreground">
+                      No phone integrations configured yet.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                twilioIntegrations.map((integration) => (
+                  <Card key={integration.id}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <span>{integration.phone_number}</span>
+                        <div className="flex items-center space-x-2">
+                          {integration.sms_enabled && (
+                            <Badge variant="secondary">
+                              <MessageSquare className="h-3 w-3 mr-1" />
+                              SMS
+                            </Badge>
+                          )}
+                          {integration.voice_enabled && (
+                            <Badge variant="secondary">
+                              <Phone className="h-3 w-3 mr-1" />
+                              Voice
+                            </Badge>
+                          )}
+                          <Badge variant={integration.is_active ? "default" : "destructive"}>
+                            {integration.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <p><strong>Client:</strong> {clients.find(c => c.id === integration.client_id)?.name}</p>
+                        <p><strong>Account SID:</strong> {integration.account_sid}</p>
+                        <p><strong>Webhook URLs:</strong></p>
+                        <div className="bg-muted p-3 rounded text-sm space-y-1">
+                          <p><strong>SMS:</strong> https://ycvvuepfsebqpwmamqgg.functions.supabase.co/functions/v1/twilio-sms-webhook</p>
+                          <p><strong>Voice:</strong> https://ycvvuepfsebqpwmamqgg.functions.supabase.co/functions/v1/twilio-voice-webhook</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
