@@ -68,11 +68,19 @@ const Auth = () => {
     });
 
     if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error.message === "Email not confirmed") {
+        toast({
+          title: "Email Not Confirmed",
+          description: "Your account exists but needs to be confirmed. Please check your email or contact support to manually confirm your account.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } else {
       navigate('/dashboard');
     }
