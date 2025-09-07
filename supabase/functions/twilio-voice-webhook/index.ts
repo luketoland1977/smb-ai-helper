@@ -47,22 +47,31 @@ async function searchKnowledgeBase(clientId: string, query: string): Promise<str
 }
 
 serve(async (req) => {
+  console.log('=== TWILIO VOICE WEBHOOK CALLED ===');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'incoming';
+    console.log('Action parameter:', action);
 
     // Parse form data from Twilio webhook
+    console.log('Parsing form data...');
     const formData = await req.formData();
     const from = formData.get('From') as string;
     const to = formData.get('To') as string;
     const callSid = formData.get('CallSid') as string;
     const speechResult = formData.get('SpeechResult') as string;
 
+    console.log('Form data parsed:', { from, to, callSid, speechResult });
     console.log('Voice webhook called:', { action, from, to, callSid, speechResult });
 
     if (action === 'incoming') {
