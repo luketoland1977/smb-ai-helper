@@ -279,7 +279,7 @@ Please use this information to provide accurate, helpful responses. Keep respons
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-realtime-preview-2024-12-17',
+          model: 'gpt-5-mini-2025-08-07',
           messages: [
             {
               role: 'system',
@@ -310,7 +310,7 @@ Please use this information to provide accurate, helpful responses. Keep respons
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-nano-2025-08-07',
             messages: [
               {
                 role: 'system',
@@ -351,8 +351,8 @@ Please use this information to provide accurate, helpful responses. Keep respons
           var aiResponse = "I'm here to help you with your request.";
         } else {
           var aiResponse = data.choices[0].message.content;
-          console.log('✅ USING REAL-TIME MODEL RESPONSE - gpt-4o-realtime-preview-2024-12-17');
-          console.log('Real-time model response length:', aiResponse?.length || 0);
+          console.log('✅ USING GPT-5-MINI MODEL RESPONSE - gpt-5-mini-2025-08-07');
+          console.log('GPT-5-Mini model response length:', aiResponse?.length || 0);
         }
       }
       
