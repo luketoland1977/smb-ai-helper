@@ -1,6 +1,7 @@
 // AI Service Pro Chat Widget
 (function() {
   'use strict';
+  console.log('AI Widget: Script starting to load...');
 
   // Configuration
   const script = document.currentScript;
@@ -432,6 +433,8 @@
 
   // Initialize widget
   const init = () => {
+    console.log('AI Widget: Initializing with CLIENT_ID:', CLIENT_ID, 'AGENT_ID:', AGENT_ID);
+    
     if (!CLIENT_ID || !AGENT_ID) {
       console.error('AI Chat Widget: Missing required configuration (clientId or agentId)');
       return;
@@ -440,6 +443,7 @@
     createStyles();
     const widget = createWidget();
     document.body.appendChild(widget);
+    console.log('AI Widget: Widget added to DOM');
 
     // Event listeners
     const toggle = widget.querySelector('.ai-chat-toggle');
@@ -448,15 +452,26 @@
     const form = document.getElementById('ai-chat-form');
     const input = document.getElementById('ai-chat-input');
 
+    console.log('AI Widget: Elements found:', {
+      toggle: !!toggle,
+      closeBtn: !!closeBtn,
+      chatWindow: !!chatWindow,
+      form: !!form,
+      input: !!input
+    });
+
     toggle.addEventListener('click', () => {
+      console.log('AI Widget: Toggle clicked, current state:', isOpen);
       isOpen = !isOpen;
       chatWindow.style.display = isOpen ? 'flex' : 'none';
+      console.log('AI Widget: New state:', isOpen);
       if (isOpen) {
         input.focus();
       }
     });
 
     closeBtn.addEventListener('click', () => {
+      console.log('AI Widget: Close button clicked');
       isOpen = false;
       chatWindow.style.display = 'none';
     });
@@ -477,6 +492,7 @@
 
     // Add welcome message to messages array
     messages.push({ role: 'assistant', content: config.welcomeMessage });
+    console.log('AI Widget: Initialization complete');
   };
 
   // Initialize when DOM is ready
