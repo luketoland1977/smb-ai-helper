@@ -387,7 +387,7 @@ const ChatWidgetManager = () => {
                 {/* Live Widget Preview */}
                 <div className="p-4 bg-muted rounded-lg">
                   <h4 className="font-medium mb-2">Live Preview</h4>
-                  <div className="relative h-96 bg-white rounded border overflow-hidden">
+                  <div className="relative h-[500px] bg-white rounded border overflow-hidden">
                     <iframe
                       srcDoc={`
                         <!DOCTYPE html>
