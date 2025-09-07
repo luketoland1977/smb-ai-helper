@@ -92,9 +92,9 @@ const Auth = () => {
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">AI Service Pro</CardTitle>
+          <CardTitle className="text-2xl font-bold">Admin Access</CardTitle>
           <CardDescription>
-            Access your AI customer service platform
+            Sign in to access the AI Service Pro admin dashboard
           </CardDescription>
         </CardHeader>
         <CardContent>
