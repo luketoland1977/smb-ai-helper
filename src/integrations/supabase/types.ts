@@ -97,36 +97,45 @@ export type Database = {
         Row: {
           agent_id: string | null
           client_id: string | null
+          communication_channel: string | null
           created_at: string | null
           customer_email: string | null
           customer_name: string | null
           id: string
+          phone_number: string | null
           session_data: Json | null
           status: string | null
+          twilio_session_id: string | null
           updated_at: string | null
           visitor_id: string | null
         }
         Insert: {
           agent_id?: string | null
           client_id?: string | null
+          communication_channel?: string | null
           created_at?: string | null
           customer_email?: string | null
           customer_name?: string | null
           id?: string
+          phone_number?: string | null
           session_data?: Json | null
           status?: string | null
+          twilio_session_id?: string | null
           updated_at?: string | null
           visitor_id?: string | null
         }
         Update: {
           agent_id?: string | null
           client_id?: string | null
+          communication_channel?: string | null
           created_at?: string | null
           customer_email?: string | null
           customer_name?: string | null
           id?: string
+          phone_number?: string | null
           session_data?: Json | null
           status?: string | null
+          twilio_session_id?: string | null
           updated_at?: string | null
           visitor_id?: string | null
         }
@@ -249,34 +258,43 @@ export type Database = {
         Row: {
           agent_id: string | null
           client_id: string | null
+          communication_channel: string | null
           created_at: string | null
           customer_email: string | null
           customer_name: string | null
           id: string
           metadata: Json | null
+          phone_number: string | null
           status: Database["public"]["Enums"]["conversation_status"] | null
+          twilio_session_id: string | null
           updated_at: string | null
         }
         Insert: {
           agent_id?: string | null
           client_id?: string | null
+          communication_channel?: string | null
           created_at?: string | null
           customer_email?: string | null
           customer_name?: string | null
           id?: string
           metadata?: Json | null
+          phone_number?: string | null
           status?: Database["public"]["Enums"]["conversation_status"] | null
+          twilio_session_id?: string | null
           updated_at?: string | null
         }
         Update: {
           agent_id?: string | null
           client_id?: string | null
+          communication_channel?: string | null
           created_at?: string | null
           customer_email?: string | null
           customer_name?: string | null
           id?: string
           metadata?: Json | null
+          phone_number?: string | null
           status?: Database["public"]["Enums"]["conversation_status"] | null
+          twilio_session_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -472,6 +490,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      twilio_integrations: {
+        Row: {
+          account_sid: string
+          client_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          phone_number: string
+          sms_enabled: boolean
+          updated_at: string
+          voice_enabled: boolean
+          voice_settings: Json | null
+        }
+        Insert: {
+          account_sid: string
+          client_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          phone_number: string
+          sms_enabled?: boolean
+          updated_at?: string
+          voice_enabled?: boolean
+          voice_settings?: Json | null
+        }
+        Update: {
+          account_sid?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          phone_number?: string
+          sms_enabled?: boolean
+          updated_at?: string
+          voice_enabled?: boolean
+          voice_settings?: Json | null
+        }
+        Relationships: []
       }
     }
     Views: {
