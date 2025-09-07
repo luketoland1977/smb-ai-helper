@@ -73,13 +73,12 @@ const ChatWidgetManager = () => {
 
       if (agentsData) setAgents(agentsData);
 
-      // Load existing widgets
-      const { data: widgetsData } = await supabase
-        .from('chat_widgets')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (widgetsData) setWidgets(widgetsData);
+      // TODO: Load existing widgets once types are regenerated
+      // const { data: widgetsData } = await supabase
+      //   .from('chat_widgets')
+      //   .select('*')
+      //   .order('created_at', { ascending: false });
+      // if (widgetsData) setWidgets(widgetsData);
       
     } catch (error) {
       console.error('Error loading data:', error);
@@ -93,70 +92,6 @@ const ChatWidgetManager = () => {
     }
   };
 
-  const handleCreateWidget = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.client_id || !formData.agent_id) {
-      toast({
-        title: "Error",
-        description: "Please select both client and agent",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const widgetConfig = {
-        primary_color: formData.primary_color,
-        welcome_message: formData.welcome_message,
-        position: formData.position,
-        size: formData.size
-      };
-
-      const embedCode = generateEmbedCode(formData.client_id, formData.agent_id, widgetConfig);
-
-      const { data, error } = await supabase
-        .from('chat_widgets')
-        .insert([{
-          client_id: formData.client_id,
-          agent_id: formData.agent_id,
-          widget_name: formData.widget_name,
-          widget_config: widgetConfig,
-          embed_code: embedCode,
-          is_active: true
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Widget created successfully!",
-      });
-
-      setShowCreateForm(false);
-      setFormData({
-        client_id: '',
-        agent_id: '',
-        widget_name: '',
-        primary_color: '#2563eb',
-        welcome_message: 'Hello! How can I help you today?',
-        position: 'bottom-right',
-        size: 'medium'
-      });
-      
-      loadData(); // Refresh the widgets list
-      
-    } catch (error) {
-      console.error('Error creating widget:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create widget",
-        variant: "destructive",
-      });
-    }
-  };
 
   const generateEmbedCode = (clientId: string, agentId: string, config: any) => {
     const baseUrl = window.location.origin;
@@ -195,7 +130,20 @@ const ChatWidgetManager = () => {
     const embedCode = generateEmbedCode(formData.client_id, formData.agent_id, config);
 
     try {
-      // For now, we'll just show the embed code since we don't have the widgets table yet
+      // TODO: Save to database once types are regenerated
+      // const { data, error } = await supabase
+      //   .from('chat_widgets')
+      //   .insert([{
+      //     client_id: formData.client_id,
+      //     agent_id: formData.agent_id,
+      //     widget_name: formData.widget_name,
+      //     widget_config: config,
+      //     embed_code: embedCode,
+      //     is_active: true
+      //   }])
+      //   .select()
+      //   .single();
+
       toast({
         title: "Widget Created",
         description: "Your chat widget has been configured. Copy the embed code below.",

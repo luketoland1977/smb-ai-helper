@@ -147,6 +147,42 @@ export type Database = {
           },
         ]
       }
+      chat_widgets: {
+        Row: {
+          agent_id: string
+          client_id: string
+          created_at: string
+          embed_code: string
+          id: string
+          is_active: boolean
+          updated_at: string
+          widget_config: Json
+          widget_name: string
+        }
+        Insert: {
+          agent_id: string
+          client_id: string
+          created_at?: string
+          embed_code: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          widget_config?: Json
+          widget_name: string
+        }
+        Update: {
+          agent_id?: string
+          client_id?: string
+          created_at?: string
+          embed_code?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          widget_config?: Json
+          widget_name?: string
+        }
+        Relationships: []
+      }
       client_users: {
         Row: {
           client_id: string | null
