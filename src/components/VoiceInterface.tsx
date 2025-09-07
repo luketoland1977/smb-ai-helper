@@ -34,6 +34,14 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ agentId, onSpeakingChan
   const startConversation = async () => {
     setIsConnecting(true);
     try {
+      // First check if microphone access is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Microphone access is not supported in this browser');
+      }
+
+      // Request microphone permission explicitly before initializing chat
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      
       chatRef.current = new RealtimeChat(handleMessage);
       await chatRef.current.init(agentId);
       setIsConnected(true);
@@ -44,9 +52,23 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ agentId, onSpeakingChan
       });
     } catch (error) {
       console.error('Error starting conversation:', error);
+      
+      let errorMessage = 'Failed to start conversation';
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          errorMessage = 'Microphone access denied. Please click the microphone icon in your browser\'s address bar and allow access, then try again.';
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = 'No microphone found. Please connect a microphone and try again.';
+        } else if (error.name === 'NotReadableError') {
+          errorMessage = 'Microphone is being used by another application. Please close other apps using your microphone and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to start conversation',
+        title: "Microphone Permission Required",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
