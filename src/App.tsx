@@ -13,6 +13,7 @@ import Chat from "./pages/Chat";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import ChatWidgetManager from "./pages/ChatWidgetManager";
 import NotFound from "./pages/NotFound";
+import PasswordProtection from "./components/PasswordProtection";
 
 const queryClient = new QueryClient();
 
@@ -25,14 +26,14 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/clients/new" element={<ClientForm />} />
-          <Route path="/clients/:id" element={<ClientForm />} />
-          <Route path="/clients/:clientId/knowledge-base" element={<KnowledgeBase />} />
-          <Route path="/agents/new" element={<AgentForm />} />
-          <Route path="/agents/:id" element={<AgentForm />} />
-          <Route path="/chat/:agentId" element={<Chat />} />
-          <Route path="/widgets" element={<ChatWidgetManager />} />
+          <Route path="/dashboard" element={<PasswordProtection><Dashboard /></PasswordProtection>} />
+          <Route path="/clients/new" element={<PasswordProtection><ClientForm /></PasswordProtection>} />
+          <Route path="/clients/:id" element={<PasswordProtection><ClientForm /></PasswordProtection>} />
+          <Route path="/clients/:clientId/knowledge-base" element={<PasswordProtection><KnowledgeBase /></PasswordProtection>} />
+          <Route path="/agents/new" element={<PasswordProtection><AgentForm /></PasswordProtection>} />
+          <Route path="/agents/:id" element={<PasswordProtection><AgentForm /></PasswordProtection>} />
+          <Route path="/chat/:agentId" element={<PasswordProtection><Chat /></PasswordProtection>} />
+          <Route path="/widgets" element={<PasswordProtection><ChatWidgetManager /></PasswordProtection>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
