@@ -19,7 +19,7 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -34,10 +34,19 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
-      toast({
-        title: "Success",
-        description: "Check your email for confirmation link",
-      });
+      // Check if user was immediately signed in (email confirmation disabled)
+      if (data.session) {
+        toast({
+          title: "Success",
+          description: "Account created successfully! Redirecting...",
+        });
+        navigate('/dashboard');
+      } else {
+        toast({
+          title: "Success",
+          description: "Check your email for confirmation link",
+        });
+      }
     }
     
     setLoading(false);
