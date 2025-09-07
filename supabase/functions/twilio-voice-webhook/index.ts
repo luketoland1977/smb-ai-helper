@@ -75,13 +75,56 @@ serve(async (req) => {
     console.log('Voice webhook called:', { action, from, to, callSid, speechResult });
 
     if (action === 'incoming') {
-      // Handle incoming call - using reliable speech approach first
+      // Find agent first to get custom welcome message
+      const phoneFormats = [
+        to,
+        to.replace(/\D/g, ''),
+        `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`,
+        `+${to.slice(1, 2)} ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`
+      ];
+
+      const { data: twilioIntegration } = await supabase
+        .from('twilio_integrations')
+        .select(`
+          *,
+          ai_agents (
+            name,
+            settings,
+            system_prompt
+          )
+        `)
+        .in('phone_number', phoneFormats)
+        .eq('is_active', true)
+        .eq('voice_enabled', true)
+        .single();
+
+      // Get custom welcome message from agent settings or use default
+      let welcomeMessage = "Hello! I'm your AI assistant. How can I help you today?";
+      let followUpMessage = "Please tell me what you need help with.";
+      
+      if (twilioIntegration?.ai_agents) {
+        const agent = twilioIntegration.ai_agents;
+        const agentSettings = agent.settings || {};
+        
+        // Check for custom welcome messages in agent settings
+        if (agentSettings.welcome_message) {
+          welcomeMessage = agentSettings.welcome_message;
+        } else if (agent.name) {
+          welcomeMessage = `Hello! I'm ${agent.name}, your AI assistant. How can I help you today?`;
+        }
+        
+        if (agentSettings.follow_up_message) {
+          followUpMessage = agentSettings.follow_up_message;
+        }
+      }
+
       const fullUrl = `https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-webhook?action=process`;
       console.log('Setting gather action URL to:', fullUrl);
+      console.log('Using welcome message:', welcomeMessage);
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">Hello! I'm your AI assistant. How can I help you today?</Say>
+    <Say voice="alice">${welcomeMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Say>
     <Gather 
         input="speech" 
         action="${fullUrl}"
@@ -89,12 +132,12 @@ serve(async (req) => {
         speechTimeout="5"
         speechModel="experimental_conversations"
         enhanced="true">
-        <Say voice="alice">Please tell me what you need help with.</Say>
+        <Say voice="alice">${followUpMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Say>
     </Gather>
     <Say voice="alice">I didn't hear anything. Please call back if you need assistance. Goodbye!</Say>
 </Response>`;
 
-      console.log('Generated TwiML for incoming call:', twiml);
+      console.log('Generated TwiML with custom welcome message');
       return new Response(twiml, {
         headers: { 'Content-Type': 'text/xml' },
       });
