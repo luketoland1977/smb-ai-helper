@@ -314,6 +314,108 @@ export type Database = {
           },
         ]
       }
+      crm_activities: {
+        Row: {
+          activity_data: Json | null
+          activity_type: string
+          conversation_id: string | null
+          created_at: string | null
+          crm_activity_id: string | null
+          error_message: string | null
+          id: string
+          integration_id: string | null
+          success: boolean | null
+        }
+        Insert: {
+          activity_data?: Json | null
+          activity_type: string
+          conversation_id?: string | null
+          created_at?: string | null
+          crm_activity_id?: string | null
+          error_message?: string | null
+          id?: string
+          integration_id?: string | null
+          success?: boolean | null
+        }
+        Update: {
+          activity_data?: Json | null
+          activity_type?: string
+          conversation_id?: string | null
+          created_at?: string | null
+          crm_activity_id?: string | null
+          error_message?: string | null
+          id?: string
+          integration_id?: string | null
+          success?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activities_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_customer_mappings: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          crm_customer_id: string
+          crm_type: Database["public"]["Enums"]["integration_type"]
+          customer_data: Json | null
+          id: string
+          integration_id: string | null
+          internal_customer_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          crm_customer_id: string
+          crm_type: Database["public"]["Enums"]["integration_type"]
+          customer_data?: Json | null
+          id?: string
+          integration_id?: string | null
+          internal_customer_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          crm_customer_id?: string
+          crm_type?: Database["public"]["Enums"]["integration_type"]
+          customer_data?: Json | null
+          id?: string
+          integration_id?: string | null
+          internal_customer_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_customer_mappings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_customer_mappings_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integrations: {
         Row: {
           client_id: string | null
@@ -321,7 +423,10 @@ export type Database = {
           created_at: string | null
           id: string
           is_active: boolean | null
+          last_sync_at: string | null
           name: string
+          oauth_tokens: Json | null
+          sync_settings: Json | null
           type: Database["public"]["Enums"]["integration_type"]
           updated_at: string | null
         }
@@ -331,7 +436,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          last_sync_at?: string | null
           name: string
+          oauth_tokens?: Json | null
+          sync_settings?: Json | null
           type: Database["public"]["Enums"]["integration_type"]
           updated_at?: string | null
         }
@@ -341,7 +449,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          last_sync_at?: string | null
           name?: string
+          oauth_tokens?: Json | null
+          sync_settings?: Json | null
           type?: Database["public"]["Enums"]["integration_type"]
           updated_at?: string | null
         }
@@ -556,6 +667,10 @@ export type Database = {
         | "crm_salesforce"
         | "email_smtp"
         | "chat_widget"
+        | "hubspot"
+        | "salesforce"
+        | "pipedrive"
+        | "zoho"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -690,6 +805,10 @@ export const Constants = {
         "crm_salesforce",
         "email_smtp",
         "chat_widget",
+        "hubspot",
+        "salesforce",
+        "pipedrive",
+        "zoho",
       ],
     },
   },
