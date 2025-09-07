@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { User } from '@supabase/supabase-js';
 import { Plus, Bot, MessageSquare, Settings } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -25,7 +24,6 @@ interface Agent {
 }
 
 const Dashboard = () => {
-  const [user, setUser] = useState<User | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,27 +31,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate('/auth');
-        return;
-      }
-      setUser(session.user);
-      await loadData();
-    };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        navigate('/auth');
-      } else if (session) {
-        setUser(session.user);
-      }
-    });
-
-    getSession();
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    loadData();
+  }, []);
 
   const loadData = async () => {
     try {
@@ -87,9 +66,6 @@ const Dashboard = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
 
   if (loading) {
     return (
@@ -109,12 +85,8 @@ const Dashboard = () => {
               <h1 className="text-xl font-semibold text-foreground">AI Service Pro</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-muted-foreground">{user?.email}</span>
               <Button variant="outline" onClick={() => navigate('/widgets')}>
                 Chat Widgets
-              </Button>
-              <Button variant="outline" onClick={handleSignOut}>
-                Sign Out
               </Button>
             </div>
           </div>
