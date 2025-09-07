@@ -393,6 +393,8 @@ export type Database = {
           filename: string
           id: string
           processed: boolean | null
+          source_type: string | null
+          source_url: string | null
           title: string
           updated_at: string | null
         }
@@ -406,6 +408,8 @@ export type Database = {
           filename: string
           id?: string
           processed?: boolean | null
+          source_type?: string | null
+          source_url?: string | null
           title: string
           updated_at?: string | null
         }
@@ -419,6 +423,8 @@ export type Database = {
           filename?: string
           id?: string
           processed?: boolean | null
+          source_type?: string | null
+          source_url?: string | null
           title?: string
           updated_at?: string | null
         }
