@@ -87,6 +87,8 @@ const ChatWidgetManager = () => {
     voice_enabled: true,
     voice: 'alice',
     language: 'en-US',
+    welcome_message: '',
+    follow_up_message: '',
   });
 
   useEffect(() => {
@@ -257,7 +259,9 @@ const ChatWidgetManager = () => {
           voice_enabled: twilioFormData.voice_enabled,
           voice_settings: {
             voice: twilioFormData.voice,
-            language: twilioFormData.language
+            language: twilioFormData.language,
+            welcome_message: twilioFormData.welcome_message,
+            follow_up_message: twilioFormData.follow_up_message
           }
         })
         .select()
@@ -283,6 +287,8 @@ const ChatWidgetManager = () => {
         voice_enabled: true,
         voice: 'alice',
         language: 'en-US',
+        welcome_message: '',
+        follow_up_message: '',
       });
 
     } catch (error) {
@@ -702,6 +708,70 @@ const ChatWidgetManager = () => {
                         placeholder="Your Twilio Auth Token"
                         required
                       />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-foreground">Voice Settings</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="voice">Voice</Label>
+                        <select
+                          id="voice"
+                          value={twilioFormData.voice}
+                          onChange={(e) => setTwilioFormData({ ...twilioFormData, voice: e.target.value })}
+                          className="w-full p-2 border border-border rounded-md bg-background"
+                        >
+                          <option value="alice">Alice (Female)</option>
+                          <option value="man">Man (Male)</option>
+                          <option value="woman">Woman (Female)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="language">Language</Label>
+                        <select
+                          id="language"
+                          value={twilioFormData.language}
+                          onChange={(e) => setTwilioFormData({ ...twilioFormData, language: e.target.value })}
+                          className="w-full p-2 border border-border rounded-md bg-background"
+                        >
+                          <option value="en-US">English (US)</option>
+                          <option value="en-GB">English (UK)</option>
+                          <option value="es-ES">Spanish</option>
+                          <option value="fr-FR">French</option>
+                          <option value="de-DE">German</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="welcome-message">Custom Welcome Message</Label>
+                      <Textarea
+                        id="welcome-message"
+                        value={twilioFormData.welcome_message}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, welcome_message: e.target.value })}
+                        placeholder="e.g., Hello! I'm Sarah from TechCorp Support. How can I help you today?"
+                        rows={2}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Leave empty to use agent name: "Hello! I'm [Agent Name], your AI assistant..."
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="follow-up-message">Follow-up Prompt</Label>
+                      <Textarea
+                        id="follow-up-message"
+                        value={twilioFormData.follow_up_message}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, follow_up_message: e.target.value })}
+                        placeholder="e.g., Please describe the issue you're experiencing."
+                        rows={2}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Leave empty to use default: "Please tell me what you need help with."
+                      </p>
                     </div>
                   </div>
 

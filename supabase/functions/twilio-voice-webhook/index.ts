@@ -98,23 +98,27 @@ serve(async (req) => {
         .eq('voice_enabled', true)
         .single();
 
-      // Get custom welcome message from agent settings or use default
+      // Get custom welcome message from voice settings or agent settings
       let welcomeMessage = "Hello! I'm your AI assistant. How can I help you today?";
       let followUpMessage = "Please tell me what you need help with.";
       
       if (twilioIntegration?.ai_agents) {
         const agent = twilioIntegration.ai_agents;
-        const agentSettings = agent.settings || {};
+        const voiceSettings = twilioIntegration.voice_settings || {};
         
-        // Check for custom welcome messages in agent settings
-        if (agentSettings.welcome_message) {
-          welcomeMessage = agentSettings.welcome_message;
+        // First check voice settings (from widgets UI), then agent settings
+        if (voiceSettings.welcome_message) {
+          welcomeMessage = voiceSettings.welcome_message;
+        } else if (agent.settings?.welcome_message) {
+          welcomeMessage = agent.settings.welcome_message;
         } else if (agent.name) {
           welcomeMessage = `Hello! I'm ${agent.name}, your AI assistant. How can I help you today?`;
         }
         
-        if (agentSettings.follow_up_message) {
-          followUpMessage = agentSettings.follow_up_message;
+        if (voiceSettings.follow_up_message) {
+          followUpMessage = voiceSettings.follow_up_message;
+        } else if (agent.settings?.follow_up_message) {
+          followUpMessage = agent.settings.follow_up_message;
         }
       }
 
