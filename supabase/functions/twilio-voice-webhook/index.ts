@@ -108,10 +108,14 @@ serve(async (req) => {
         });
       }
 
-      // Find Twilio integration by phone number
+      // Find Twilio integration by phone number with associated agent
       const { data: twilioIntegration, error: twilioError } = await supabase
         .from('twilio_integrations')
-        .select('*, clients!inner(*)')
+        .select(`
+          *,
+          clients!inner(*),
+          ai_agents!inner(*)
+        `)
         .eq('phone_number', to)
         .eq('is_active', true)
         .eq('voice_enabled', true)
@@ -131,20 +135,14 @@ serve(async (req) => {
 
       const clientId = twilioIntegration.client_id;
       
-      // Get the first active agent for this client
-      const { data: agent, error: agentError } = await supabase
-        .from('ai_agents')
-        .select('*')
-        .eq('client_id', clientId)
-        .eq('status', 'active')
-        .limit(1)
-        .single();
+      // Use the agent associated with this phone number
+      const agent = twilioIntegration.ai_agents;
 
-      if (agentError || !agent) {
-        console.error('No active agent found for client:', clientId);
+      if (!agent) {
+        console.error('No agent associated with this phone number:', to);
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">I'm sorry, our service is temporarily unavailable. Please try again later. Goodbye!</Say>
+    <Say voice="alice">I'm sorry, no agent is configured for this number. Please contact support. Goodbye!</Say>
 </Response>`;
 
         return new Response(twiml, {

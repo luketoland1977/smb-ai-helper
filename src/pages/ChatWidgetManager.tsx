@@ -24,6 +24,7 @@ interface ChatWidget {
 interface TwilioIntegration {
   id: string;
   client_id: string;
+  agent_id: string;
   account_sid: string;
   phone_number: string;
   is_active: boolean;
@@ -32,6 +33,14 @@ interface TwilioIntegration {
   voice_settings: any;
   created_at: string;
   updated_at: string;
+  clients?: {
+    id: string;
+    name: string;
+  };
+  ai_agents?: {
+    id: string;
+    name: string;
+  };
 }
 
 interface Agent {
@@ -69,6 +78,7 @@ const ChatWidgetManager = () => {
 
   const [twilioFormData, setTwilioFormData] = useState({
     client_id: '',
+    agent_id: '',
     account_sid: '',
     auth_token: '',
     phone_number: '',
@@ -113,7 +123,7 @@ const ChatWidgetManager = () => {
         .from('twilio_integrations')
         .select('*')
         .order('created_at', { ascending: false });
-      if (twilioData) setTwilioIntegrations(twilioData);
+      if (twilioData) setTwilioIntegrations(twilioData as any);
       
     } catch (error) {
       console.error('Error loading data:', error);
@@ -225,11 +235,21 @@ const ChatWidgetManager = () => {
   };
 
   const createTwilioIntegration = async () => {
+    if (!twilioFormData.client_id || !twilioFormData.agent_id || !twilioFormData.phone_number || !twilioFormData.account_sid) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('twilio_integrations')
         .insert({
           client_id: twilioFormData.client_id,
+          agent_id: twilioFormData.agent_id,
           account_sid: twilioFormData.account_sid,
           phone_number: twilioFormData.phone_number,
           sms_enabled: twilioFormData.sms_enabled,
@@ -254,6 +274,7 @@ const ChatWidgetManager = () => {
       setShowTwilioForm(false);
       setTwilioFormData({
         client_id: '',
+        agent_id: '',
         account_sid: '',
         auth_token: '',
         phone_number: '',
@@ -625,6 +646,26 @@ const ChatWidgetManager = () => {
                     </div>
 
                     <div className="space-y-2">
+                      <Label htmlFor="agent">AI Agent *</Label>
+                      <select
+                        id="agent"
+                        value={twilioFormData.agent_id}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, agent_id: e.target.value })}
+                        className="w-full p-2 border border-border rounded-md bg-background"
+                        required
+                      >
+                        <option value="">Select an agent</option>
+                        {agents
+                          .filter(agent => !twilioFormData.client_id || agent.client_id === twilioFormData.client_id)
+                          .map((agent) => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
                       <Label htmlFor="phone-number">Phone Number *</Label>
                       <Input
                         id="phone-number"
@@ -725,10 +766,11 @@ const ChatWidgetManager = () => {
                         </div>
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p><strong>Client:</strong> {clients.find(c => c.id === integration.client_id)?.name}</p>
-                        <p><strong>Account SID:</strong> {integration.account_sid}</p>
+                     <CardContent>
+                       <div className="space-y-2">
+                         <p><strong>Client:</strong> {clients.find(c => c.id === integration.client_id)?.name || 'Unknown'}</p>
+                         <p><strong>Agent:</strong> {agents.find(a => a.id === integration.agent_id)?.name || 'Unknown'}</p>
+                         <p><strong>Account SID:</strong> {integration.account_sid}</p>
                         <p><strong>Webhook URLs:</strong></p>
                         <div className="bg-muted p-3 rounded text-sm space-y-1">
                           <p><strong>SMS:</strong> https://ycvvuepfsebqpwmamqgg.functions.supabase.co/functions/v1/twilio-sms-webhook</p>

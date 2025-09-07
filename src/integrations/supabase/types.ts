@@ -494,6 +494,7 @@ export type Database = {
       twilio_integrations: {
         Row: {
           account_sid: string
+          agent_id: string | null
           client_id: string
           created_at: string
           id: string
@@ -506,6 +507,7 @@ export type Database = {
         }
         Insert: {
           account_sid: string
+          agent_id?: string | null
           client_id: string
           created_at?: string
           id?: string
@@ -518,6 +520,7 @@ export type Database = {
         }
         Update: {
           account_sid?: string
+          agent_id?: string | null
           client_id?: string
           created_at?: string
           id?: string
@@ -528,7 +531,15 @@ export type Database = {
           voice_enabled?: boolean
           voice_settings?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "twilio_integrations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
