@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Upload, FileText, Trash2, Download } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Trash2, Download, Link, Globe } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Document {
   id: string;
@@ -18,6 +20,8 @@ interface Document {
   file_path: string;
   processed: boolean;
   created_at: string;
+  source_type?: 'file' | 'url';
+  source_url?: string;
 }
 
 interface Client {
@@ -34,6 +38,8 @@ const KnowledgeBase = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [webUrl, setWebUrl] = useState('');
+  const [scrapingUrl, setScrapingUrl] = useState(false);
 
   useEffect(() => {
     if (clientId) {
@@ -156,6 +162,51 @@ const KnowledgeBase = () => {
     }
   };
 
+  const handleUrlScraping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!webUrl || !clientId) return;
+
+    setScrapingUrl(true);
+    setUploadProgress(0);
+
+    try {
+      console.log('Starting web scraping for URL:', webUrl);
+      setUploadProgress(25);
+
+      // Call our edge function to scrape the website
+      const { data, error } = await supabase.functions
+        .invoke('scrape-website', {
+          body: { 
+            url: webUrl,
+            client_id: clientId 
+          }
+        });
+
+      if (error) throw error;
+
+      setUploadProgress(100);
+      
+      toast({
+        title: "Success",
+        description: "Website content scraped and added to knowledge base",
+      });
+
+      setWebUrl('');
+      loadDocuments();
+      
+    } catch (error: any) {
+      console.error('Error scraping website:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to scrape website content",
+        variant: "destructive",
+      });
+    } finally {
+      setScrapingUrl(false);
+      setUploadProgress(0);
+    }
+  };
+
   const handleDeleteDocument = async (document: Document) => {
     try {
       // Delete from storage
@@ -229,34 +280,86 @@ const KnowledgeBase = () => {
         <div className="mb-8">
           <Card>
             <CardHeader>
-              <CardTitle>Upload Documents</CardTitle>
+              <CardTitle>Add to Knowledge Base</CardTitle>
               <CardDescription>
-                Upload documents to enhance your AI agent's knowledge base. 
-                Supported formats: TXT, JSON, PDF (coming soon), DOC (coming soon)
+                Upload documents or scrape website content to enhance your AI agent's knowledge base
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="file-upload">Choose File</Label>
-                  <Input
-                    id="file-upload"
-                    type="file"
-                    onChange={handleFileUpload}
-                    disabled={uploading}
-                    accept=".txt,.json,.pdf,.doc,.docx"
-                    className="mt-2"
-                  />
-                </div>
-                {uploading && (
-                  <div className="space-y-2">
-                    <Progress value={uploadProgress} />
-                    <p className="text-sm text-muted-foreground">
-                      Uploading and processing document...
+              <Tabs defaultValue="files" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="files">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Files
+                  </TabsTrigger>
+                  <TabsTrigger value="urls">
+                    <Globe className="h-4 w-4 mr-2" />
+                    Scrape Websites
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="files" className="space-y-4">
+                  <div>
+                    <Label htmlFor="file-upload">Choose File</Label>
+                    <Input
+                      id="file-upload"
+                      type="file"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                      accept=".txt,.json,.pdf,.doc,.docx"
+                      className="mt-2"
+                    />
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Supported formats: TXT, JSON, PDF (coming soon), DOC (coming soon)
                     </p>
                   </div>
-                )}
-              </div>
+                  {uploading && (
+                    <div className="space-y-2">
+                      <Progress value={uploadProgress} />
+                      <p className="text-sm text-muted-foreground">
+                        Uploading and processing document...
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="urls" className="space-y-4">
+                  <form onSubmit={handleUrlScraping} className="space-y-4">
+                    <div>
+                      <Label htmlFor="web-url">Website URL</Label>
+                      <Input
+                        id="web-url"
+                        type="url"
+                        value={webUrl}
+                        onChange={(e) => setWebUrl(e.target.value)}
+                        placeholder="https://example.com"
+                        disabled={scrapingUrl}
+                        className="mt-2"
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Enter a website URL to scrape its content and add it to the knowledge base
+                      </p>
+                    </div>
+                    <Button 
+                      type="submit" 
+                      disabled={scrapingUrl || !webUrl}
+                      className="w-full sm:w-auto"
+                    >
+                      <Link className="h-4 w-4 mr-2" />
+                      {scrapingUrl ? 'Scraping...' : 'Scrape Website'}
+                    </Button>
+                  </form>
+                  {scrapingUrl && (
+                    <div className="space-y-2">
+                      <Progress value={uploadProgress} />
+                      <p className="text-sm text-muted-foreground">
+                        Scraping and processing website content...
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>
@@ -280,13 +383,26 @@ const KnowledgeBase = () => {
                 {documents.map((document) => (
                   <div key={document.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
                     <div className="flex items-center space-x-4">
-                      <FileText className="h-8 w-8 text-muted-foreground" />
+                      {document.source_type === 'url' ? (
+                        <Globe className="h-8 w-8 text-muted-foreground" />
+                      ) : (
+                        <FileText className="h-8 w-8 text-muted-foreground" />
+                      )}
                       <div>
                         <h3 className="font-medium">{document.title}</h3>
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                          <span>{document.filename}</span>
-                          <span>{formatFileSize(document.file_size)}</span>
-                          <span>{document.file_type}</span>
+                          {document.source_type === 'url' ? (
+                            <>
+                              <span>Website: {document.source_url}</span>
+                              <span>Scraped content</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>{document.filename}</span>
+                              <span>{formatFileSize(document.file_size)}</span>
+                              <span>{document.file_type}</span>
+                            </>
+                          )}
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             document.processed 
                               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
