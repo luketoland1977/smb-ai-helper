@@ -380,13 +380,20 @@
 
   // Send message to backend
   const sendMessage = async (message) => {
+    console.log('AI Widget: Sending message:', message);
     const sendButton = document.getElementById('ai-chat-send');
     const input = document.getElementById('ai-chat-input');
+    
+    if (!sendButton || !input) {
+      console.error('AI Widget: Send button or input not found');
+      return;
+    }
     
     sendButton.disabled = true;
     showTyping();
 
     try {
+      console.log('AI Widget: Making fetch request to:', `${config.apiUrl}/functions/v1/widget-chat`);
       const response = await fetch(`${config.apiUrl}/functions/v1/widget-chat`, {
         method: 'POST',
         headers: {
@@ -400,7 +407,9 @@
         })
       });
 
+      console.log('AI Widget: Response status:', response.status);
       const data = await response.json();
+      console.log('AI Widget: Response data:', data);
       
       hideTyping();
       
@@ -411,12 +420,13 @@
       }
       
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('AI Widget: Error sending message:', error);
       hideTyping();
       addMessage('I apologize, but I\'m experiencing technical difficulties. Please try again in a moment.', 'assistant');
     } finally {
       sendButton.disabled = false;
       input.focus();
+      console.log('AI Widget: Message sending completed');
     }
   };
 
@@ -453,11 +463,15 @@
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
+      console.log('AI Widget: Form submitted');
       const message = input.value.trim();
       if (message) {
+        console.log('AI Widget: Adding user message and sending:', message);
         addMessage(message, 'user');
         input.value = '';
         sendMessage(message);
+      } else {
+        console.log('AI Widget: Empty message, not sending');
       }
     });
 
