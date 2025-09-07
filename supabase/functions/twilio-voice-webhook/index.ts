@@ -268,6 +268,8 @@ Please use this information to provide accurate, helpful responses. Keep respons
       }
 
       console.log('Using OpenAI Real-time model for voice response...');
+      console.log('OpenAI API Key available:', !!openAIApiKey);
+      console.log('Speech result received:', speechResult);
       
       // Use the real-time model directly through chat completions for TwiML compatibility
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -349,7 +351,8 @@ Please use this information to provide accurate, helpful responses. Keep respons
           var aiResponse = "I'm here to help you with your request.";
         } else {
           var aiResponse = data.choices[0].message.content;
-          console.log('Using real-time model response');
+          console.log('✅ USING REAL-TIME MODEL RESPONSE - gpt-4o-realtime-preview-2024-12-17');
+          console.log('Real-time model response length:', aiResponse?.length || 0);
         }
       }
       
