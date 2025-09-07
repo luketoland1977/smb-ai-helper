@@ -12,6 +12,14 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Store active conversations for WebSocket management
+const activeConversations = new Map<string, {
+  openAISocket: WebSocket | null;
+  twilioSocket: WebSocket | null;
+  conversationId: string;
+  agentConfig: any;
+}>();
+
 // Search knowledge base for relevant content
 async function searchKnowledgeBase(clientId: string, query: string): Promise<string | null> {
   try {
@@ -58,6 +66,13 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Check if this is a WebSocket upgrade request
+  const upgradeHeader = req.headers.get("upgrade");
+  if (upgradeHeader?.toLowerCase() === "websocket") {
+    console.log('Handling WebSocket upgrade for real-time voice streaming');
+    return handleWebSocketUpgrade(req);
+  }
+
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'incoming';
@@ -69,341 +84,28 @@ serve(async (req) => {
     const from = formData.get('From') as string;
     const to = formData.get('To') as string;
     const callSid = formData.get('CallSid') as string;
-    const speechResult = formData.get('SpeechResult') as string;
 
-    console.log('Form data parsed:', { from, to, callSid, speechResult });
-    console.log('Voice webhook called:', { action, from, to, callSid, speechResult });
+    console.log('Form data parsed:', { from, to, callSid });
+    console.log('Voice webhook called:', { action, from, to, callSid });
 
     if (action === 'incoming') {
-      // Handle incoming call - use enhanced speech recognition with real-time model
-      const fullUrl = `https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-webhook?action=process`;
-      console.log('Setting gather action URL to:', fullUrl);
+      // Handle incoming call - start Media Stream for real-time voice
+      const streamUrl = `wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-webhook?action=stream&callSid=${callSid}&from=${from}&to=${to}`;
+      console.log('Setting up Media Stream for real-time voice:', streamUrl);
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">Hello! I'm your AI assistant with enhanced voice capabilities. How can I help you today?</Say>
-    <Gather 
-        input="speech" 
-        action="${fullUrl}"
-        method="POST"
-        speechTimeout="5"
-        speechModel="experimental_conversations"
-        enhanced="true">
-        <Say voice="alice">Please tell me what you need help with.</Say>
-    </Gather>
-    <Say voice="alice">I didn't hear anything. Please call back if you need assistance. Goodbye!</Say>
+    <Say voice="alice">Hello! Connecting you to our AI assistant with real-time voice.</Say>
+    <Connect>
+        <Stream url="${streamUrl}">
+            <Parameter name="callSid" value="${callSid}" />
+            <Parameter name="from" value="${from}" />
+            <Parameter name="to" value="${to}" />
+        </Stream>
+    </Connect>
 </Response>`;
 
-      console.log('Generated TwiML for incoming call with enhanced speech:', twiml);
-      return new Response(twiml, {
-        headers: { 'Content-Type': 'text/xml' },
-      });
-    }
-
-    if (action === 'process') {
-      // Process speech and generate AI response
-      if (!speechResult) {
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="alice">I'm sorry, I didn't understand what you said. Please try again.</Say>
-    <Gather 
-        input="speech" 
-        action="${url.origin}${url.pathname}?action=process"
-        method="POST"
-        speechTimeout="3"
-        speechModel="experimental_conversations">
-        <Say voice="alice">How can I help you?</Say>
-    </Gather>
-    <Say voice="alice">Goodbye!</Say>
-</Response>`;
-
-        return new Response(twiml, {
-          headers: { 'Content-Type': 'text/xml' },
-        });
-      }
-
-      // Find Twilio integration by phone number - handle different formats
-      console.log('Looking for Twilio integration with phone number:', to);
-      
-      // Try multiple phone number formats
-      const phoneFormats = [
-        to, // Original format
-        to.replace(/\D/g, ''), // Just digits
-        `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`, // +1 XXX XXX XXXX format
-        `+${to.slice(1, 2)} ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}` // +X XXX XXX XXXX format
-      ];
-      
-      console.log('Trying phone number formats:', phoneFormats);
-      
-      const { data: twilioIntegration, error: twilioError } = await supabase
-        .from('twilio_integrations')
-        .select('*')
-        .in('phone_number', phoneFormats)
-        .eq('is_active', true)
-        .eq('voice_enabled', true)
-        .single();
-
-      if (twilioError || !twilioIntegration) {
-        console.error('No Twilio integration found for number:', to);
-        console.error('Database error:', twilioError);
-        console.error('Searched formats:', phoneFormats);
-        
-        // Let's also check what integrations exist
-        const { data: allIntegrations } = await supabase
-          .from('twilio_integrations')
-          .select('phone_number, is_active, voice_enabled')
-          .eq('is_active', true);
-        console.log('Available integrations:', allIntegrations);
-        
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="alice">I'm sorry, our service is temporarily unavailable. Please try again later. Goodbye!</Say>
-</Response>`;
-
-        return new Response(twiml, {
-          headers: { 'Content-Type': 'text/xml' },
-        });
-      }
-
-      const clientId = twilioIntegration.client_id;
-      const agentId = twilioIntegration.agent_id;
-
-      // Get the agent details separately
-      const { data: agent, error: agentError } = await supabase
-        .from('ai_agents')
-        .select('*')
-        .eq('id', agentId)
-        .single();
-
-      if (agentError || !agent) {
-        console.error('No agent found for ID:', agentId, agentError);
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="alice">I'm sorry, no agent is configured for this number. Please contact support. Goodbye!</Say>
-</Response>`;
-
-        return new Response(twiml, {
-          headers: { 'Content-Type': 'text/xml' },
-        });
-      }
-
-      // Check for existing conversation or create new one
-      let conversationId: string;
-      const { data: existingConversation } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('phone_number', from)
-        .eq('communication_channel', 'voice')
-        .eq('twilio_session_id', callSid)
-        .single();
-
-      if (existingConversation) {
-        conversationId = existingConversation.id;
-      } else {
-        // Create new conversation
-        const { data: newConversation, error: convError } = await supabase
-          .from('conversations')
-          .insert({
-            client_id: clientId,
-            agent_id: agent.id,
-            communication_channel: 'voice',
-            phone_number: from,
-            twilio_session_id: callSid,
-            status: 'active',
-            metadata: { call_sid: callSid }
-          })
-          .select('id')
-          .single();
-
-        if (convError || !newConversation) {
-          console.error('Failed to create conversation:', convError);
-          throw new Error('Failed to create conversation');
-        }
-        conversationId = newConversation.id;
-      }
-
-      // Store user message
-      await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          role: 'user',
-          content: speechResult,
-          metadata: { call_sid: callSid, phone_number: from }
-        });
-
-      // Get OpenAI API key
-      const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-      if (!openAIApiKey) {
-        console.error('OpenAI API key not configured');
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="alice">I'm sorry, my AI service is not configured. Please contact support. Goodbye!</Say>
-</Response>`;
-        return new Response(twiml, {
-          headers: { 'Content-Type': 'text/xml' },
-        });
-      }
-
-      console.log('OpenAI API key found, generating response...');
-
-      // Build contextual prompt with knowledge base integration
-      let contextualPrompt = agent.system_prompt || `You are a helpful AI customer service agent. You assist customers with their inquiries in a friendly and professional manner via phone calls.
-
-Guidelines:
-- Keep responses conversational and natural for voice
-- Be polite and helpful
-- Provide accurate information based on the knowledge base when available
-- Ask clarifying questions when needed
-- Speak clearly and at a moderate pace
-- If the conversation seems complete, offer to help with anything else or say goodbye`;
-
-      // Search knowledge base for relevant context
-      const knowledgeContext = await searchKnowledgeBase(clientId, speechResult);
-      if (knowledgeContext) {
-        contextualPrompt += `\n\nRelevant information from knowledge base:
-${knowledgeContext}
-
-Please use this information to provide accurate, helpful responses. Keep responses natural for voice conversation.`;
-      }
-
-      console.log('Using OpenAI Real-time model for voice response...');
-      console.log('OpenAI API Key available:', !!openAIApiKey);
-      console.log('Speech result received:', speechResult);
-      
-      // Use OpenAI chat completions with voice-optimized model
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'system',
-              content: contextualPrompt + '\n\nIMPORTANT: You are on a phone call. Respond naturally and conversationally as if speaking directly to the caller. Keep responses concise but helpful, and speak in a way that sounds natural when converted to speech.'
-            },
-            {
-              role: 'user',
-              content: speechResult
-            }
-          ],
-          max_tokens: 300,
-          temperature: 0.8,
-        }),
-      });
-
-      console.log('Real-time model API response status:', response.status);
-
-      if (!response.ok) {
-        console.log('Real-time model failed, falling back to standard API...');
-        const errorData = await response.text();
-        console.error('Real-time model error:', response.status, errorData);
-        
-        // Fallback to standard OpenAI API
-        const fallbackResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              {
-                role: 'system',
-                content: contextualPrompt
-              },
-              {
-                role: 'user',
-                content: speechResult
-              }
-            ],
-            max_tokens: 400,
-            temperature: 0.7,
-          }),
-        });
-
-        if (!fallbackResponse.ok) {
-          const fallbackErrorData = await fallbackResponse.text();
-          console.error('Fallback API error:', fallbackResponse.status, fallbackErrorData);
-          
-          const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-  <Response>
-      <Say voice="alice">I'm sorry, I'm having trouble understanding right now. Please try again later. Goodbye!</Say>
-  </Response>`;
-          return new Response(twiml, {
-            headers: { 'Content-Type': 'text/xml' },
-          });
-        }
-
-        const fallbackData = await fallbackResponse.json();
-        var aiResponse = fallbackData.choices?.[0]?.message?.content || "I'm here to help you with your request.";
-        console.log('Fallback API response used');
-      } else {
-        const data = await response.json();
-        console.log('Real-time model response received successfully');
-        
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-          console.error('Invalid real-time model response structure:', data);
-          var aiResponse = "I'm here to help you with your request.";
-        } else {
-          var aiResponse = data.choices[0].message.content;
-          console.log('✅ USING GPT-5-MINI MODEL RESPONSE - gpt-5-mini-2025-08-07');
-          console.log('GPT-5-Mini model response length:', aiResponse?.length || 0);
-        }
-      }
-      
-      console.log('AI response generated:', aiResponse?.substring(0, 100) + '...');
-
-      // Store AI response
-      await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          role: 'assistant',
-          content: aiResponse,
-          metadata: { channel: 'voice', call_sid: callSid }
-        });
-
-      // Get voice settings
-      const voiceSettings = twilioIntegration.voice_settings || { voice: 'alice', language: 'en-US' };
-      const voice = voiceSettings.voice || 'alice';
-      
-      console.log('Using voice settings:', voiceSettings);
-
-      // Escape XML characters in AI response
-      const escapedResponse = aiResponse
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-
-      console.log('Creating TwiML response with voice:', voice);
-
-      // Create TwiML response with AI message and continue conversation
-      const fullUrl = `https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-webhook?action=process`;
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="${voice}">${escapedResponse}</Say>
-    <Gather 
-        input="speech" 
-        action="${fullUrl}"
-        method="POST"
-        speechTimeout="5"
-        speechModel="experimental_conversations">
-        <Say voice="${voice}">Is there anything else I can help you with?</Say>
-    </Gather>
-    <Say voice="${voice}">Thank you for calling. Have a great day! Goodbye!</Say>
-</Response>`;
-
-      console.log('TwiML generated successfully, sending response');
-      console.log('Voice conversation processed successfully');
-
+      console.log('Generated TwiML for real-time voice streaming:', twiml);
       return new Response(twiml, {
         headers: { 'Content-Type': 'text/xml' },
       });
@@ -432,3 +134,294 @@ Please use this information to provide accurate, helpful responses. Keep respons
     });
   }
 });
+
+// Handle WebSocket upgrade for Media Stream
+function handleWebSocketUpgrade(req: Request): Response {
+  const url = new URL(req.url);
+  const callSid = url.searchParams.get('callSid');
+  const from = url.searchParams.get('from');
+  const to = url.searchParams.get('to');
+
+  console.log('WebSocket upgrade params:', { callSid, from, to });
+
+  if (!callSid || !from || !to) {
+    return new Response('Missing required parameters', { status: 400 });
+  }
+
+  const { socket, response } = Deno.upgradeWebSocket(req);
+  
+  socket.onopen = async () => {
+    console.log('Twilio WebSocket connected for call:', callSid);
+    await setupRealtimeVoiceSession(socket, { callSid, from, to });
+  };
+
+  socket.onmessage = async (event) => {
+    await handleTwilioMessage(event, callSid);
+  };
+
+  socket.onclose = () => {
+    console.log('Twilio WebSocket closed for call:', callSid);
+    cleanupSession(callSid);
+  };
+
+  socket.onerror = (error) => {
+    console.error('Twilio WebSocket error:', error);
+    cleanupSession(callSid);
+  };
+
+  return response;
+}
+
+// Setup real-time voice session with OpenAI
+async function setupRealtimeVoiceSession(twilioSocket: WebSocket, params: { callSid: string, from: string, to: string }) {
+  const { callSid, from, to } = params;
+  
+  try {
+    // Find Twilio integration by phone number
+    console.log('Looking for Twilio integration with phone number:', to);
+    
+    const phoneFormats = [
+      to,
+      to.replace(/\D/g, ''),
+      `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`,
+      `+${to.slice(1, 2)} ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`
+    ];
+    
+    const { data: twilioIntegration, error: twilioError } = await supabase
+      .from('twilio_integrations')
+      .select('*')
+      .in('phone_number', phoneFormats)
+      .eq('is_active', true)
+      .eq('voice_enabled', true)
+      .single();
+
+    if (twilioError || !twilioIntegration) {
+      console.error('No Twilio integration found for number:', to);
+      twilioSocket.close();
+      return;
+    }
+
+    const clientId = twilioIntegration.client_id;
+    const agentId = twilioIntegration.agent_id;
+
+    // Get the agent details
+    const { data: agent, error: agentError } = await supabase
+      .from('ai_agents')
+      .select('*')
+      .eq('id', agentId)
+      .single();
+
+    if (agentError || !agent) {
+      console.error('No agent found for ID:', agentId);
+      twilioSocket.close();
+      return;
+    }
+
+    // Create conversation record
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .insert({
+        client_id: clientId,
+        agent_id: agent.id,
+        communication_channel: 'voice',
+        phone_number: from,
+        twilio_session_id: callSid,
+        status: 'active',
+        metadata: { call_sid: callSid, real_time: true }
+      })
+      .select('id')
+      .single();
+
+    if (convError || !conversation) {
+      console.error('Failed to create conversation:', convError);
+      twilioSocket.close();
+      return;
+    }
+
+    // Connect to OpenAI Real-time API
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIApiKey) {
+      console.error('OpenAI API key not configured');
+      twilioSocket.close();
+      return;
+    }
+
+    console.log('Connecting to OpenAI Real-time API...');
+    const openAISocket = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'OpenAI-Beta': 'realtime=v1'
+      }
+    });
+
+    // Store session info
+    activeConversations.set(callSid, {
+      openAISocket,
+      twilioSocket,
+      conversationId: conversation.id,
+      agentConfig: { agent, clientId }
+    });
+
+    // Setup OpenAI WebSocket handlers
+    openAISocket.onopen = () => {
+      console.log('OpenAI WebSocket connected');
+      
+      // Send session configuration
+      const sessionConfig = {
+        type: 'session.update',
+        session: {
+          modalities: ['text', 'audio'],
+          instructions: agent.system_prompt || `You are a helpful AI customer service agent. You assist customers with their inquiries in a friendly and professional manner via phone calls.
+
+Guidelines:
+- Keep responses conversational and natural for voice
+- Be polite and helpful
+- Provide accurate information based on the knowledge base when available
+- Ask clarifying questions when needed
+- Speak clearly and at a moderate pace
+- If the conversation seems complete, offer to help with anything else or say goodbye`,
+          voice: 'alloy',
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
+          input_audio_transcription: {
+            model: 'whisper-1'
+          },
+          turn_detection: {
+            type: 'server_vad',
+            threshold: 0.5,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 1000
+          },
+          temperature: 0.8,
+          max_response_output_tokens: 'inf'
+        }
+      };
+      
+      console.log('Sending session configuration to OpenAI');
+      openAISocket.send(JSON.stringify(sessionConfig));
+    };
+
+    openAISocket.onmessage = async (event) => {
+      await handleOpenAIMessage(event, callSid);
+    };
+
+    openAISocket.onclose = () => {
+      console.log('OpenAI WebSocket closed');
+      cleanupSession(callSid);
+    };
+
+    openAISocket.onerror = (error) => {
+      console.error('OpenAI WebSocket error:', error);
+      cleanupSession(callSid);
+    };
+
+  } catch (error) {
+    console.error('Error setting up real-time voice session:', error);
+    twilioSocket.close();
+  }
+}
+
+// Handle messages from Twilio Media Stream
+async function handleTwilioMessage(event: MessageEvent, callSid: string) {
+  try {
+    const message = JSON.parse(event.data);
+    const session = activeConversations.get(callSid);
+    
+    if (!session || !session.openAISocket) {
+      console.log('No active session found for call:', callSid);
+      return;
+    }
+
+    console.log('Twilio message type:', message.event);
+
+    if (message.event === 'media') {
+      // Forward audio data to OpenAI
+      const audioEvent = {
+        type: 'input_audio_buffer.append',
+        audio: message.media.payload // Twilio sends base64 encoded audio
+      };
+      
+      session.openAISocket.send(JSON.stringify(audioEvent));
+    } else if (message.event === 'start') {
+      console.log('Media stream started:', message);
+    } else if (message.event === 'stop') {
+      console.log('Media stream stopped');
+      cleanupSession(callSid);
+    }
+  } catch (error) {
+    console.error('Error handling Twilio message:', error);
+  }
+}
+
+// Handle messages from OpenAI Real-time API
+async function handleOpenAIMessage(event: MessageEvent, callSid: string) {
+  try {
+    const message = JSON.parse(event.data);
+    const session = activeConversations.get(callSid);
+    
+    if (!session || !session.twilioSocket) {
+      console.log('No active session found for call:', callSid);
+      return;
+    }
+
+    console.log('OpenAI message type:', message.type);
+
+    if (message.type === 'session.created') {
+      console.log('OpenAI session created successfully');
+    } else if (message.type === 'response.audio.delta') {
+      // Forward audio response back to Twilio
+      const mediaMessage = {
+        event: 'media',
+        streamSid: session.twilioSocket,
+        media: {
+          payload: message.delta // OpenAI sends base64 encoded audio
+        }
+      };
+      
+      session.twilioSocket.send(JSON.stringify(mediaMessage));
+    } else if (message.type === 'conversation.item.input_audio_transcription.completed') {
+      // Store user message in database
+      if (message.transcript) {
+        await supabase
+          .from('messages')
+          .insert({
+            conversation_id: session.conversationId,
+            role: 'user',
+            content: message.transcript,
+            metadata: { channel: 'voice', call_sid: callSid, real_time: true }
+          });
+      }
+    } else if (message.type === 'response.text.done') {
+      // Store AI response in database
+      if (message.text) {
+        await supabase
+          .from('messages')
+          .insert({
+            conversation_id: session.conversationId,
+            role: 'assistant',
+            content: message.text,
+            metadata: { channel: 'voice', call_sid: callSid, real_time: true }
+          });
+      }
+    } else if (message.type === 'error') {
+      console.error('OpenAI API error:', message.error);
+    }
+  } catch (error) {
+    console.error('Error handling OpenAI message:', error);
+  }
+}
+
+// Cleanup session when call ends
+function cleanupSession(callSid: string) {
+  const session = activeConversations.get(callSid);
+  if (session) {
+    if (session.openAISocket && session.openAISocket.readyState === WebSocket.OPEN) {
+      session.openAISocket.close();
+    }
+    if (session.twilioSocket && session.twilioSocket.readyState === WebSocket.OPEN) {
+      session.twilioSocket.close();
+    }
+    activeConversations.delete(callSid);
+    console.log('Cleaned up session for call:', callSid);
+  }
+}
