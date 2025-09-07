@@ -60,11 +60,6 @@ const ClientForm = () => {
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
 
       if (isEditing) {
         // Update existing client
@@ -88,17 +83,6 @@ const ClientForm = () => {
           .single();
 
         if (clientError) throw clientError;
-
-        // Add user to client_users table
-        const { error: userError } = await supabase
-          .from('client_users')
-          .insert([{
-            client_id: client.id,
-            user_id: user.id,
-            role: 'admin'
-          }]);
-
-        if (userError) throw userError;
 
         toast({
           title: "Success",
