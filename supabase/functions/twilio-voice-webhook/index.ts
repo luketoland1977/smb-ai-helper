@@ -76,20 +76,24 @@ serve(async (req) => {
 
     if (action === 'incoming') {
       // Handle incoming call - return initial greeting with speech recognition
+      const fullUrl = `https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-webhook?action=process`;
+      console.log('Setting gather action URL to:', fullUrl);
+      
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say voice="alice">Hello! I'm your AI assistant. How can I help you today?</Say>
     <Gather 
         input="speech" 
-        action="${url.origin}${url.pathname}?action=process"
+        action="${fullUrl}"
         method="POST"
-        speechTimeout="3"
+        speechTimeout="5"
         speechModel="experimental_conversations">
         <Say voice="alice">Please tell me what you need help with.</Say>
     </Gather>
     <Say voice="alice">I didn't hear anything. Please call back if you need assistance. Goodbye!</Say>
 </Response>`;
 
+      console.log('Generated TwiML for incoming call:', twiml);
       return new Response(twiml, {
         headers: { 'Content-Type': 'text/xml' },
       });
@@ -326,12 +330,13 @@ Please use this information to provide accurate, helpful responses. Keep respons
       console.log('Creating TwiML response with voice:', voice);
 
       // Create TwiML response with AI message and continue conversation
+      const fullUrl = `https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-webhook?action=process`;
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say voice="${voice}">${escapedResponse}</Say>
     <Gather 
         input="speech" 
-        action="${url.origin}${url.pathname}?action=process"
+        action="${fullUrl}"
         method="POST"
         speechTimeout="5"
         speechModel="experimental_conversations">
