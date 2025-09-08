@@ -259,6 +259,40 @@ serve(async (req) => {
         });
       }
 
+      // Check if realtime voice is enabled
+      const voiceSettings = twilioIntegration.voice_settings || {};
+      if (voiceSettings.use_realtime === true) {
+        console.log('Using OpenAI Real-time Voice Interface for call:', callSid);
+        
+        // Get welcome message
+        let welcomeMessage = "Hello! How can I help you today?";
+        if (voiceSettings.welcome_message) {
+          welcomeMessage = voiceSettings.welcome_message;
+        } else if (agent.settings?.welcome_message) {
+          welcomeMessage = agent.settings.welcome_message;
+        } else if (agent.name) {
+          welcomeMessage = `Hello! I'm ${agent.name}. How can I help you today?`;
+        }
+        
+        // Generate TwiML with WebSocket stream to our realtime voice function
+        const streamUrl = `wss://${url.hostname}/functions/v1/twilio-realtime-voice?callSid=${callSid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+        
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="${voiceSettings.voice || 'alloy'}">${welcomeMessage}</Say>
+    <Connect>
+        <Stream url="${streamUrl}" />
+    </Connect>
+</Response>`;
+
+        console.log('Generated real-time TwiML:', twiml);
+        return new Response(twiml, {
+          headers: { 'Content-Type': 'text/xml' },
+        });
+      }
+
+      console.log('Using standard speech-to-text mode for call:', callSid);
+
       // Check for existing conversation or create new one
       let conversationId: string;
       const { data: existingConversation } = await supabase
