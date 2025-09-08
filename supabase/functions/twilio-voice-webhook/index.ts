@@ -75,7 +75,7 @@ serve(async (req) => {
     console.log('Voice webhook called:', { action, from, to, callSid, speechResult });
 
     if (action === 'incoming') {
-      // Find agent first to get custom welcome message
+      // Check if real-time voice is enabled for this agent
       const phoneFormats = [
         to,
         to.replace(/\D/g, ''),
@@ -98,13 +98,38 @@ serve(async (req) => {
         .eq('voice_enabled', true)
         .single();
 
+      // Check if real-time voice is enabled
+      const voiceSettings = twilioIntegration?.voice_settings || {};
+      const useRealtime = voiceSettings.use_realtime === true;
+
+      if (useRealtime && twilioIntegration) {
+        console.log('Using real-time voice interface for call:', callSid);
+        
+        // Start real-time voice stream
+        const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${callSid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+        
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Connect>
+        <Stream url="${realtimeUrl}" />
+    </Connect>
+</Response>`;
+
+        console.log('Generated real-time TwiML');
+        return new Response(twiml, {
+          headers: { 'Content-Type': 'text/xml' },
+        });
+      }
+
+      // Fallback to standard speech-to-text mode
+      console.log('Using standard speech-to-text mode for call:', callSid);
+
       // Get custom welcome message from voice settings or agent settings
       let welcomeMessage = "Hello! I'm your AI assistant. How can I help you today?";
       let followUpMessage = "Please tell me what you need help with.";
       
       if (twilioIntegration?.ai_agents) {
         const agent = twilioIntegration.ai_agents;
-        const voiceSettings = twilioIntegration.voice_settings || {};
         
         // First check voice settings (from widgets UI), then agent settings
         if (voiceSettings.welcome_message) {

@@ -85,6 +85,7 @@ const ChatWidgetManager = () => {
     phone_number: '',
     sms_enabled: true,
     voice_enabled: true,
+    use_realtime: false,
     voice: 'alice',
     language: 'en-US',
     welcome_message: '',
@@ -261,7 +262,8 @@ const ChatWidgetManager = () => {
             voice: twilioFormData.voice,
             language: twilioFormData.language,
             welcome_message: twilioFormData.welcome_message,
-            follow_up_message: twilioFormData.follow_up_message
+            follow_up_message: twilioFormData.follow_up_message,
+            use_realtime: twilioFormData.use_realtime
           }
         })
         .select()
@@ -285,6 +287,7 @@ const ChatWidgetManager = () => {
         phone_number: '',
         sms_enabled: true,
         voice_enabled: true,
+        use_realtime: false,
         voice: 'alice',
         language: 'en-US',
         welcome_message: '',
@@ -714,6 +717,24 @@ const ChatWidgetManager = () => {
                   <div className="space-y-4">
                     <h4 className="font-medium text-foreground">Voice Settings</h4>
                     
+                    <div className="flex items-center space-x-2 p-3 border rounded-lg bg-muted/50">
+                      <input
+                        type="checkbox"
+                        id="use-realtime"
+                        checked={twilioFormData.use_realtime}
+                        onChange={(e) => setTwilioFormData({ ...twilioFormData, use_realtime: e.target.checked })}
+                        className="rounded border-gray-300"
+                      />
+                      <div className="flex-1">
+                        <Label htmlFor="use-realtime" className="text-sm font-medium">
+                          Use OpenAI Real-time Voice Interface
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Enable ultra-low latency voice conversation with natural interruptions (Experimental)
+                        </p>
+                      </div>
+                    </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <Label htmlFor="voice">Voice</Label>
@@ -723,9 +744,22 @@ const ChatWidgetManager = () => {
                           onChange={(e) => setTwilioFormData({ ...twilioFormData, voice: e.target.value })}
                           className="w-full p-2 border border-border rounded-md bg-background"
                         >
-                          <option value="alice">Alice (Female)</option>
-                          <option value="man">Man (Male)</option>
-                          <option value="woman">Woman (Female)</option>
+                          {twilioFormData.use_realtime ? (
+                            <>
+                              <option value="alloy">Alloy (Real-time)</option>
+                              <option value="echo">Echo (Real-time)</option>
+                              <option value="shimmer">Shimmer (Real-time)</option>
+                              <option value="sage">Sage (Real-time)</option>
+                              <option value="verse">Verse (Real-time)</option>
+                              <option value="coral">Coral (Real-time)</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="alice">Alice (Female)</option>
+                              <option value="man">Man (Male)</option>
+                              <option value="woman">Woman (Female)</option>
+                            </>
+                          )}
                         </select>
                       </div>
 
