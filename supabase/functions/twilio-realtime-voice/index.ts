@@ -262,7 +262,7 @@ async function initializeRealtimeSession(twilioSocket: WebSocket, params: { call
       return;
     }
 
-    // Connect to OpenAI Realtime API
+    // Connect directly to OpenAI Realtime API
     const openAISocket = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
@@ -274,8 +274,7 @@ async function initializeRealtimeSession(twilioSocket: WebSocket, params: { call
 
     openAISocket.onopen = () => {
       console.log('OpenAI WebSocket connection opened for call:', callSid);
-      
-      // Wait for session.created event before configuring
+      // Session will be configured when session.created event is received
     };
 
     openAISocket.onmessage = async (event) => {
@@ -361,10 +360,6 @@ You are speaking directly with a customer over the phone right now.`;
       } catch (error) {
         console.error('Error processing OpenAI message:', error);
       }
-    };
-
-    openAISocket.onmessage = (event) => {
-      handleOpenAIMessage(event, callSid);
     };
 
     openAISocket.onclose = () => {
