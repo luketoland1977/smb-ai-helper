@@ -28,48 +28,22 @@ serve(async (req) => {
     console.log('Action parameter:', action);
 
     if (action === 'incoming') {
+      console.log('🎯 Processing incoming call...');
+      
       // Parse form data from Twilio webhook
       const formData = await req.formData();
       const from = formData.get('From') as string;
       const to = formData.get('To') as string;
       const callSid = formData.get('CallSid') as string;
 
-      console.log('Incoming call:', { from, to, callSid });
+      console.log('📞 Call details:', { from, to, callSid });
 
-      // Simple phone number lookup - directly check for (844) 789-0436
-      const { data: twilioIntegration, error: twilioError } = await supabase
-        .from('twilio_integrations')
-        .select(`
-          *,
-          ai_agents (
-            id,
-            name,
-            system_prompt,
-            settings
-          )
-        `)
-        .eq('phone_number', '(844) 789-0436')
-        .eq('is_active', true)
-        .eq('voice_enabled', true)
-        .single();
-
-      if (twilioError || !twilioIntegration) {
-        console.error('No Twilio integration found for (844) 789-0436:', twilioError);
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="alice">I'm sorry, this number is not configured for voice support. Please contact support.</Say>
-</Response>`;
-        return new Response(twiml, {
-          headers: { 'Content-Type': 'text/xml' },
-        });
-      }
-
-      console.log('Found integration, connecting to WebSocket...');
+      // DIRECT CONNECTION TO WEBSOCKET - BYPASSING DATABASE FOR NOW
+      console.log('🚀 CONNECTING DIRECTLY TO WEBSOCKET (bypassing database)');
       
-      // Try the direct functions URL format
       const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
       
-      console.log('WebSocket URL:', realtimeUrl);
+      console.log('🔗 WebSocket URL:', realtimeUrl);
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -78,13 +52,14 @@ serve(async (req) => {
     </Connect>
 </Response>`;
 
-      console.log('Generated WebSocket TwiML');
+      console.log('📋 Returning WebSocket TwiML to Twilio');
       return new Response(twiml, {
         headers: { 'Content-Type': 'text/xml' },
       });
     }
 
-    // Fallback response
+    // Fallback for other actions
+    console.log('❓ Unknown action, returning fallback response');
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say voice="alice">Thank you for calling. Please hang up and call again.</Say>
@@ -95,7 +70,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in Twilio voice webhook:', error);
+    console.error('❌ Error in Twilio voice webhook:', error);
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say voice="alice">I'm sorry, there was an error processing your call. Please try again later.</Say>
