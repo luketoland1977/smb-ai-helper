@@ -602,6 +602,33 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       twilio_integrations: {
         Row: {
           account_sid: string
@@ -652,6 +679,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       voice_widgets: {
         Row: {
           agent_id: string
@@ -693,10 +741,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       agent_status: "active" | "inactive" | "training"
+      app_role: "admin" | "salesperson" | "support" | "viewer"
       conversation_status: "active" | "resolved" | "escalated"
       integration_type:
         | "crm_hubspot"
@@ -835,6 +890,7 @@ export const Constants = {
   public: {
     Enums: {
       agent_status: ["active", "inactive", "training"],
+      app_role: ["admin", "salesperson", "support", "viewer"],
       conversation_status: ["active", "resolved", "escalated"],
       integration_type: [
         "crm_hubspot",

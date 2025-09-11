@@ -1,7 +1,24 @@
 import { Button } from "@/components/ui/button";
-import { Bot } from "lucide-react";
+import { Bot, LogOut, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const Navbar = () => {
+  const { user, signOut, hasRole } = useAuth();
+  const navigate = useNavigate();
+
+  const handleAuthAction = () => {
+    if (user) {
+      signOut();
+    } else {
+      navigate('/auth');
+    }
+  };
+
+  const handleDashboardAction = () => {
+    navigate('/dashboard');
+  };
+
   return (
     <nav className="absolute inset-x-0 top-0 z-50">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -29,12 +46,44 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" className="text-white border-white hover:bg-white/10">
-              Login
-            </Button>
-            <Button variant="accent" size="sm">
-              Get Started
-            </Button>
+            {user ? (
+              <>
+                {(hasRole('admin') || hasRole('salesperson') || hasRole('support')) && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-white border-white hover:bg-white/10"
+                    onClick={handleDashboardAction}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Dashboard
+                  </Button>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-white border-white hover:bg-white/10"
+                  onClick={handleAuthAction}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-white border-white hover:bg-white/10"
+                  onClick={handleAuthAction}
+                >
+                  Login
+                </Button>
+                <Button variant="accent" size="sm" onClick={handleAuthAction}>
+                  Get Started
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
