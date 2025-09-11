@@ -34,19 +34,22 @@ serve(async (req) => {
       const to = formData.get('To') as string;
       const callSid = formData.get('CallSid') as string;
 
-      console.log('Incoming call:', { from, to, callSid });
+      console.log('Incoming call details:');
+      console.log('- From:', from);
+      console.log('- To:', to);  
+      console.log('- CallSid:', callSid);
 
       // Try multiple phone number formats for integration lookup
       const phoneFormats = [
-        to, // Original format (+18447890436)
-        to.replace(/\D/g, ''), // Just digits (18447890436)
-        `(${to.slice(2, 5)}) ${to.slice(5, 8)}-${to.slice(8)}`, // (844) 789-0436
-        `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`, // +1 844 789 0436
-        `${to.slice(2, 5)}-${to.slice(5, 8)}-${to.slice(8)}`, // 844-789-0436
-        `${to.slice(2, 5)}.${to.slice(5, 8)}.${to.slice(8)}` // 844.789.0436
+        to, // Original format from Twilio
+        to.replace(/\D/g, ''), // Just digits
+        `(${to.replace(/\D/g, '').slice(1, 4)}) ${to.replace(/\D/g, '').slice(4, 7)}-${to.replace(/\D/g, '').slice(7)}`, // (844) 789-0436 format
+        `+1 (${to.replace(/\D/g, '').slice(1, 4)}) ${to.replace(/\D/g, '').slice(4, 7)}-${to.replace(/\D/g, '').slice(7)}`, // +1 (844) 789-0436
+        `${to.replace(/\D/g, '').slice(1, 4)}-${to.replace(/\D/g, '').slice(4, 7)}-${to.replace(/\D/g, '').slice(7)}`, // 844-789-0436
+        `${to.replace(/\D/g, '').slice(1, 4)}.${to.replace(/\D/g, '').slice(4, 7)}.${to.replace(/\D/g, '').slice(7)}` // 844.789.0436
       ];
 
-      console.log('Checking phone formats:', phoneFormats);
+      console.log('Phone formats to check:', phoneFormats);
 
       const { data: twilioIntegration, error: twilioError } = await supabase
         .from('twilio_integrations')
@@ -64,7 +67,9 @@ serve(async (req) => {
         .eq('voice_enabled', true)
         .single();
 
-      console.log('Twilio integration query result:', { twilioIntegration, twilioError });
+      console.log('Database query result:');
+      console.log('- Found integration:', !!twilioIntegration);
+      console.log('- Error:', twilioError?.message || 'none');
 
       if (twilioError || !twilioIntegration) {
         console.error('No Twilio integration found:', twilioError);
