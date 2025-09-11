@@ -304,6 +304,54 @@ const ChatWidgetManager = () => {
     }
   };
 
+  const handleDeleteWidget = async (widgetId: string) => {
+    try {
+      const { error } = await supabase
+        .from('chat_widgets')
+        .delete()
+        .eq('id', widgetId);
+
+      if (error) throw error;
+
+      setWidgets(widgets.filter(w => w.id !== widgetId));
+      toast({
+        title: "Success",
+        description: "Chat widget deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting widget:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete chat widget",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteTwilioIntegration = async (integrationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('twilio_integrations')
+        .delete()
+        .eq('id', integrationId);
+
+      if (error) throw error;
+
+      setTwilioIntegrations(twilioIntegrations.filter(t => t.id !== integrationId));
+      toast({
+        title: "Success",
+        description: "Phone integration deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting Twilio integration:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete phone integration",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -626,7 +674,49 @@ const ChatWidgetManager = () => {
               </div>
              </div>
            </CardContent>
-         </Card>
+          </Card>
+
+          <div className="grid gap-6">
+            <h3 className="text-lg font-semibold">Existing Chat Widgets</h3>
+            {widgets.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-center text-muted-foreground">
+                    No chat widgets created yet.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              widgets.map((widget) => (
+                <Card key={widget.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>{widget.widget_name}</span>
+                      <Badge variant={widget.is_active ? "default" : "destructive"}>
+                        {widget.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <p><strong>Client:</strong> {clients.find(c => c.id === widget.client_id)?.name || 'Unknown'}</p>
+                      <p><strong>Agent:</strong> {agents.find(a => a.id === widget.agent_id)?.name || 'Unknown'}</p>
+                      <p><strong>Created:</strong> {new Date(widget.created_at).toLocaleDateString()}</p>
+                      <div className="mt-4">
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleDeleteWidget(widget.id)}
+                        >
+                          Delete Widget
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
 
           </TabsContent>
 
@@ -884,10 +974,19 @@ const ChatWidgetManager = () => {
                         <div className="bg-muted p-3 rounded text-sm space-y-1">
                           <p><strong>SMS:</strong> https://ycvvuepfsebqpwmamqgg.functions.supabase.co/functions/v1/twilio-sms-webhook</p>
                           <p><strong>Voice:</strong> https://ycvvuepfsebqpwmamqgg.functions.supabase.co/functions/v1/twilio-voice-webhook</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                         </div>
+                         <div className="mt-4">
+                           <Button 
+                             variant="destructive" 
+                             size="sm"
+                             onClick={() => handleDeleteTwilioIntegration(integration.id)}
+                           >
+                             Delete Integration
+                           </Button>
+                         </div>
+                       </div>
+                     </CardContent>
+                   </Card>
                 ))
               )}
             </div>
