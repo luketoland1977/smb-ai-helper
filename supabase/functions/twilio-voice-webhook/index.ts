@@ -41,14 +41,15 @@ serve(async (req) => {
       // DIRECT CONNECTION TO WEBSOCKET - BYPASSING DATABASE FOR NOW
       console.log('🚀 CONNECTING DIRECTLY TO WEBSOCKET (bypassing database)');
       
-      const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-      
-      console.log('🔗 WebSocket URL:', realtimeUrl);
+      // Let's try a simple voice response first to confirm webhook works
+      console.log('🎤 TESTING WITH SIMPLE VOICE RESPONSE FIRST');
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
+    <Say voice="alice">Hello! This is PRO WEB SUPPORT. The webhook is working. Now testing WebSocket connection.</Say>
+    <Pause length="2"/>
     <Connect>
-        <Stream url="${realtimeUrl}" />
+        <Stream url="wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&amp;from=${encodeURIComponent(from)}&amp;to=${encodeURIComponent(to)}" />
     </Connect>
 </Response>`;
 
