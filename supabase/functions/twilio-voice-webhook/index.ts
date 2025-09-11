@@ -66,8 +66,8 @@ serve(async (req) => {
 
       console.log('Found integration, connecting to WebSocket...');
       
-      // Use the correct WebSocket URL format for Supabase functions
-      const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      // Try the direct functions URL format
+      const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
       
       console.log('WebSocket URL:', realtimeUrl);
       
