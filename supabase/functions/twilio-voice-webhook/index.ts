@@ -46,10 +46,9 @@ serve(async (req) => {
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">Hello! This is PRO WEB SUPPORT. The webhook is working. Now testing WebSocket connection.</Say>
-    <Pause length="2"/>
+    <Say voice="alice">Hello! This is PRO WEB SUPPORT. Connecting you now.</Say>
     <Connect>
-        <Stream url="wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&amp;from=${encodeURIComponent(from)}&amp;to=${encodeURIComponent(to)}" />
+        <Stream url="wss://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&amp;from=${encodeURIComponent(from)}&amp;to=${encodeURIComponent(to)}" />
     </Connect>
 </Response>`;
 

@@ -79,12 +79,15 @@ function pcm16ToMulaw(pcm16Data: Uint8Array): Uint8Array {
 
 serve(async (req) => {
   console.log('=== TWILIO REALTIME VOICE FUNCTION CALLED ===');
+  console.log('Request method:', req.method);
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
   
   const { headers } = req;
   const upgradeHeader = headers.get("upgrade") || "";
 
   if (upgradeHeader.toLowerCase() !== "websocket") {
-    return new Response("Expected WebSocket connection", { status: 400 });
+    console.log('❌ Not a WebSocket request:', upgradeHeader);
+    return new Response("Expected WebSocket connection", { status: 426 });
   }
 
   try {
@@ -115,15 +118,13 @@ serve(async (req) => {
       console.log('⚠️ Using default config:', error.message);
     }
 
-    const { socket, response } = Deno.upgradeWebSocket(req, {
-      idleTimeout: 300,
-    });
+    const { socket, response } = Deno.upgradeWebSocket(req);
     
     let openAISocket = null;
     let isOpenAIReady = false;
 
     socket.onopen = async () => {
-      console.log('🔗 Twilio connected');
+      console.log('🔗 Twilio WebSocket connected successfully');
       
       // Initialize OpenAI connection
       try {
@@ -134,18 +135,21 @@ serve(async (req) => {
         }
 
         console.log('🧠 Connecting to OpenAI...');
-        openAISocket = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', [
-          'Authorization', `Bearer ${apiKey}`,
-          'OpenAI-Beta', 'realtime=v1'
-        ]);
+        openAISocket = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'OpenAI-Beta': 'realtime=v1'
+          }
+        });
 
         openAISocket.onopen = () => {
-          console.log('🧠 OpenAI connected');
+          console.log('🧠 OpenAI connected successfully');
         };
 
         openAISocket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            console.log('🧠 OpenAI message:', data.type);
             
             if (data.type === 'session.created') {
               console.log('🧠 Configuring session...');
@@ -171,7 +175,7 @@ serve(async (req) => {
               
               openAISocket.send(JSON.stringify(config));
               
-              // Send greeting after a delay
+              // Send greeting after session is configured
               setTimeout(() => {
                 if (openAISocket?.readyState === WebSocket.OPEN) {
                   const greeting = {
@@ -186,7 +190,7 @@ serve(async (req) => {
                   openAISocket.send(JSON.stringify(greeting));
                   openAISocket.send(JSON.stringify({ type: 'response.create' }));
                   isOpenAIReady = true;
-                  console.log('💬 Sent greeting');
+                  console.log('💬 Sent greeting and response request');
                 }
               }, 1000);
               
@@ -232,9 +236,10 @@ serve(async (req) => {
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log('📨 Twilio message:', data.event);
         
         if (data.event === "start") {
-          console.log('🎬 Call started');
+          console.log('🎬 Call started, stream active');
           
         } else if (data.event === "media") {
           // Forward audio to OpenAI if ready
@@ -266,14 +271,14 @@ serve(async (req) => {
     };
 
     socket.onclose = (event) => {
-      console.log('🔌 Twilio closed:', event.code, event.reason);
+      console.log('🔌 Twilio WebSocket closed:', event.code, event.reason);
       if (openAISocket) {
         openAISocket.close();
       }
     };
 
     socket.onerror = (error) => {
-      console.error('❌ Twilio error:', error);
+      console.error('❌ Twilio WebSocket error:', error);
     };
 
     return response;
