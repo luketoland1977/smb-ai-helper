@@ -25,68 +25,38 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'incoming';
+    console.log('=== WEBHOOK PROCESSING START ===');
     console.log('Action parameter:', action);
 
     if (action === 'incoming') {
+      console.log('Processing incoming call...');
+      
       // Parse form data from Twilio webhook
       const formData = await req.formData();
       const from = formData.get('From') as string;
       const to = formData.get('To') as string;
       const callSid = formData.get('CallSid') as string;
 
-      console.log('Incoming call details:');
-      console.log('- From:', from);
-      console.log('- To:', to);  
-      console.log('- CallSid:', callSid);
+      console.log('=== CALL DETAILS ===');
+      console.log('From:', from);
+      console.log('To:', to);  
+      console.log('CallSid:', callSid);
 
-      // Try multiple phone number formats for integration lookup
-      const phoneFormats = [
-        to, // Original format from Twilio
-        to.replace(/\D/g, ''), // Just digits
-        `(${to.replace(/\D/g, '').slice(1, 4)}) ${to.replace(/\D/g, '').slice(4, 7)}-${to.replace(/\D/g, '').slice(7)}`, // (844) 789-0436 format
-        `+1 (${to.replace(/\D/g, '').slice(1, 4)}) ${to.replace(/\D/g, '').slice(4, 7)}-${to.replace(/\D/g, '').slice(7)}`, // +1 (844) 789-0436
-        `${to.replace(/\D/g, '').slice(1, 4)}-${to.replace(/\D/g, '').slice(4, 7)}-${to.replace(/\D/g, '').slice(7)}`, // 844-789-0436
-        `${to.replace(/\D/g, '').slice(1, 4)}.${to.replace(/\D/g, '').slice(4, 7)}.${to.replace(/\D/g, '').slice(7)}` // 844.789.0436
-      ];
-
-      console.log('Phone formats to check:', phoneFormats);
-
-      const { data: twilioIntegration, error: twilioError } = await supabase
-        .from('twilio_integrations')
-        .select(`
-          *,
-          ai_agents (
-            id,
-            name,
-            system_prompt,
-            settings
-          )
-        `)
-        .in('phone_number', phoneFormats)
-        .eq('is_active', true)
-        .eq('voice_enabled', true)
-        .single();
-
-      console.log('Database query result:');
-      console.log('- Found integration:', !!twilioIntegration);
-      console.log('- Error:', twilioError?.message || 'none');
-
-      if (twilioError || !twilioIntegration) {
-        console.error('No Twilio integration found:', twilioError);
+      if (!from || !to || !callSid) {
+        console.error('Missing required parameters:', { from, to, callSid });
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">I'm sorry, there is a technical difficulty with this service. Please contact support. Goodbye!</Say>
+    <Say voice="alice">I'm sorry, there was an error with the call parameters. Please try again.</Say>
 </Response>`;
         return new Response(twiml, {
           headers: { 'Content-Type': 'text/xml' },
         });
       }
 
-      // Always use real-time voice for all calls
-      console.log('Using real-time voice interface for call:', callSid);
-      
-      // Direct connection to real-time voice stream
+      // Direct connection to real-time voice stream (simplified for now)
+      console.log('=== GENERATING WEBSOCKET URL ===');
       const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.functions.supabase.co/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      console.log('WebSocket URL:', realtimeUrl);
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -95,7 +65,8 @@ serve(async (req) => {
     </Connect>
 </Response>`;
 
-      console.log('Generated real-time TwiML');
+      console.log('=== TWIML GENERATED ===');
+      console.log('Returning TwiML response');
       return new Response(twiml, {
         headers: { 'Content-Type': 'text/xml' },
       });
