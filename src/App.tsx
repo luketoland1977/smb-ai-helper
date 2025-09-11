@@ -15,6 +15,7 @@ import Chat from "./pages/Chat";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import ChatWidgetManager from "./pages/ChatWidgetManager";
 import NotFound from "./pages/NotFound";
+import WebSocketTest from "./components/WebSocketTest";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => (
               } 
             />
             <Route path="/chat/:agentId" element={<Chat />} />
+            <Route path="/websocket-test" element={<WebSocketTest />} />
             <Route 
               path="/widgets" 
               element={
