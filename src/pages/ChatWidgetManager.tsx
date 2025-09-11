@@ -22,6 +22,18 @@ interface ChatWidget {
   created_at: string;
 }
 
+interface VoiceWidget {
+  id: string;
+  client_id: string;
+  agent_id: string;
+  widget_name: string;
+  voice_settings: any;
+  widget_code: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 interface TwilioIntegration {
   id: string;
   client_id: string;
@@ -60,11 +72,13 @@ interface Client {
 const ChatWidgetManager = () => {
   const { toast } = useToast();
   const [widgets, setWidgets] = useState<ChatWidget[]>([]);
+  const [voiceWidgets, setVoiceWidgets] = useState<VoiceWidget[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [twilioIntegrations, setTwilioIntegrations] = useState<TwilioIntegration[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showVoiceForm, setShowVoiceForm] = useState(false);
   const [showTwilioForm, setShowTwilioForm] = useState(false);
   const [lastCreatedWidget, setLastCreatedWidget] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -75,6 +89,17 @@ const ChatWidgetManager = () => {
     welcome_message: 'Hello! How can I help you today?',
     position: 'bottom-right',
     size: 'medium',
+  });
+
+  const [voiceFormData, setVoiceFormData] = useState({
+    client_id: '',
+    agent_id: '',
+    widget_name: '',
+    position: 'bottom-right',
+    primary_color: '#2563eb',
+    system_prompt: 'You are a helpful voice assistant.',
+    voice_rate: 0.9,
+    voice_pitch: 1.0,
   });
 
   const [twilioFormData, setTwilioFormData] = useState({
@@ -122,6 +147,13 @@ const ChatWidgetManager = () => {
         .order('created_at', { ascending: false });
       if (widgetsData) setWidgets(widgetsData);
 
+      // Load voice widgets
+      const { data: voiceWidgetsData } = await supabase
+        .from('voice_widgets')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (voiceWidgetsData) setVoiceWidgets(voiceWidgetsData);
+
       // Load Twilio integrations
       const { data: twilioData } = await supabase
         .from('twilio_integrations')
@@ -157,6 +189,22 @@ const ChatWidgetManager = () => {
     document.head.appendChild(script);
   })();
 </script>`;
+  };
+
+  const generateVoiceEmbedCode = (clientId: string, agentId: string, config: any) => {
+    const baseUrl = window.location.origin;
+    return `<!-- AI Service Pro Voice Widget -->
+<script>
+  window.voiceWidgetConfig = {
+    clientId: '${clientId}',
+    agentId: '${agentId}',
+    position: '${config.position}',
+    primaryColor: '${config.primaryColor}',
+    systemPrompt: '${config.systemPrompt}',
+    apiUrl: 'https://ycvvuepfsebqpwmamqgg.functions.supabase.co/functions/v1'
+  };
+</script>
+<script src="${baseUrl}/voice-widget.js"></script>`;
   };
 
   const handleCreateWidget = async () => {
@@ -225,6 +273,97 @@ const ChatWidgetManager = () => {
       toast({
         title: "Error",
         description: "Failed to create widget",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateVoiceWidget = async () => {
+    if (!voiceFormData.client_id || !voiceFormData.agent_id || !voiceFormData.widget_name) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const config = {
+      position: voiceFormData.position,
+      primaryColor: voiceFormData.primary_color,
+      systemPrompt: voiceFormData.system_prompt,
+      voiceRate: voiceFormData.voice_rate,
+      voicePitch: voiceFormData.voice_pitch,
+    };
+
+    const embedCode = generateVoiceEmbedCode(voiceFormData.client_id, voiceFormData.agent_id, config);
+
+    try {
+      const { data, error } = await supabase
+        .from('voice_widgets')
+        .insert([{
+          client_id: voiceFormData.client_id,
+          agent_id: voiceFormData.agent_id,
+          widget_name: voiceFormData.widget_name,
+          voice_settings: config,
+          widget_code: embedCode,
+          is_active: true
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Voice Widget Created",
+        description: "Your voice widget has been configured successfully.",
+      });
+
+      // Refresh data
+      loadData();
+      setShowVoiceForm(false);
+      
+      // Reset form
+      setVoiceFormData({
+        client_id: '',
+        agent_id: '',
+        widget_name: '',
+        position: 'bottom-right',
+        primary_color: '#2563eb',
+        system_prompt: 'You are a helpful voice assistant.',
+        voice_rate: 0.9,
+        voice_pitch: 1.0,
+      });
+      
+    } catch (error) {
+      console.error('Error creating voice widget:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create voice widget",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteVoiceWidget = async (widgetId: string) => {
+    try {
+      const { error } = await supabase
+        .from('voice_widgets')
+        .delete()
+        .eq('id', widgetId);
+
+      if (error) throw error;
+
+      setVoiceWidgets(voiceWidgets.filter(w => w.id !== widgetId));
+      toast({
+        title: "Success",
+        description: "Voice widget deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting voice widget:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete voice widget",
         variant: "destructive",
       });
     }
@@ -374,6 +513,10 @@ const ChatWidgetManager = () => {
                 <MessageCircle className="h-4 w-4 mr-2" />
                 Create Widget
               </Button>
+              <Button variant="outline" onClick={() => setShowVoiceForm(true)}>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Create Voice Widget
+              </Button>
               <Button variant="outline" onClick={() => setShowTwilioForm(true)}>
                 <Phone className="h-4 w-4 mr-2" />
                 Add Phone Integration
@@ -385,10 +528,14 @@ const ChatWidgetManager = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="widgets" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="widgets">
               <MessageCircle className="h-4 w-4 mr-2" />
               Chat Widgets
+            </TabsTrigger>
+            <TabsTrigger value="voice">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Voice Widgets
             </TabsTrigger>
             <TabsTrigger value="phone">
               <Phone className="h-4 w-4 mr-2" />
@@ -718,6 +865,194 @@ const ChatWidgetManager = () => {
             )}
           </div>
 
+          </TabsContent>
+
+          <TabsContent value="voice" className="space-y-6">
+            {showVoiceForm && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create Voice Widget</CardTitle>
+                  <CardDescription>
+                    Configure an embeddable voice widget that uses speech recognition and synthesis
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="voice-client">Client *</Label>
+                      <select
+                        id="voice-client"
+                        value={voiceFormData.client_id}
+                        onChange={(e) => setVoiceFormData({ ...voiceFormData, client_id: e.target.value })}
+                        className="w-full p-2 border border-border rounded-md bg-background"
+                        required
+                      >
+                        <option value="">Select a client</option>
+                        {clients.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="voice-agent">AI Agent *</Label>
+                      <select
+                        id="voice-agent"
+                        value={voiceFormData.agent_id}
+                        onChange={(e) => setVoiceFormData({ ...voiceFormData, agent_id: e.target.value })}
+                        className="w-full p-2 border border-border rounded-md bg-background"
+                        required
+                      >
+                        <option value="">Select an agent</option>
+                        {agents
+                          .filter(agent => !voiceFormData.client_id || agent.client_id === voiceFormData.client_id)
+                          .map((agent) => (
+                            <option key={agent.id} value={agent.id}>
+                              {agent.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="voice-widget-name">Widget Name *</Label>
+                      <Input
+                        id="voice-widget-name"
+                        value={voiceFormData.widget_name}
+                        onChange={(e) => setVoiceFormData({ ...voiceFormData, widget_name: e.target.value })}
+                        placeholder="e.g., Voice Assistant"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="voice-color">Primary Color</Label>
+                      <Input
+                        id="voice-color"
+                        type="color"
+                        value={voiceFormData.primary_color}
+                        onChange={(e) => setVoiceFormData({ ...voiceFormData, primary_color: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="voice-position">Position</Label>
+                      <select
+                        id="voice-position"
+                        value={voiceFormData.position}
+                        onChange={(e) => setVoiceFormData({ ...voiceFormData, position: e.target.value })}
+                        className="w-full p-2 border border-border rounded-md bg-background"
+                      >
+                        <option value="bottom-right">Bottom Right</option>
+                        <option value="bottom-left">Bottom Left</option>
+                        <option value="top-right">Top Right</option>
+                        <option value="top-left">Top Left</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="voice-rate">Voice Rate</Label>
+                      <Input
+                        id="voice-rate"
+                        type="number"
+                        min="0.1"
+                        max="2"
+                        step="0.1"
+                        value={voiceFormData.voice_rate}
+                        onChange={(e) => setVoiceFormData({ ...voiceFormData, voice_rate: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="voice-system-prompt">System Prompt</Label>
+                    <Textarea
+                      id="voice-system-prompt"
+                      value={voiceFormData.system_prompt}
+                      onChange={(e) => setVoiceFormData({ ...voiceFormData, system_prompt: e.target.value })}
+                      placeholder="Instructions for the AI voice assistant..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-4">
+                    <Button variant="outline" onClick={() => setShowVoiceForm(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCreateVoiceWidget}>
+                      Create Voice Widget
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="grid gap-6">
+              <h3 className="text-lg font-semibold">Existing Voice Widgets</h3>
+              {voiceWidgets.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-center text-muted-foreground">
+                      No voice widgets created yet.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                voiceWidgets.map((widget) => (
+                  <Card key={widget.id}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <span>{widget.widget_name}</span>
+                        <Badge variant={widget.is_active ? "default" : "destructive"}>
+                          {widget.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <p><strong>Client:</strong> {clients.find(c => c.id === widget.client_id)?.name || 'Unknown'}</p>
+                          <p><strong>Agent:</strong> {agents.find(a => a.id === widget.agent_id)?.name || 'Unknown'}</p>
+                          <p><strong>Created:</strong> {new Date(widget.created_at).toLocaleDateString()}</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Embed Code</Label>
+                          <div className="relative">
+                            <Textarea
+                              value={widget.widget_code}
+                              readOnly
+                              className="font-mono text-sm bg-muted"
+                              rows={6}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="absolute top-2 right-2"
+                              onClick={() => copyToClipboard(widget.widget_code)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={() => handleDeleteVoiceWidget(widget.id)}
+                          >
+                            Delete Widget
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="phone" className="space-y-6">

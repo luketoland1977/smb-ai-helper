@@ -652,6 +652,42 @@ export type Database = {
           },
         ]
       }
+      voice_widgets: {
+        Row: {
+          agent_id: string
+          client_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          updated_at: string
+          voice_settings: Json | null
+          widget_code: string | null
+          widget_name: string
+        }
+        Insert: {
+          agent_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          voice_settings?: Json | null
+          widget_code?: string | null
+          widget_name: string
+        }
+        Update: {
+          agent_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          voice_settings?: Json | null
+          widget_code?: string | null
+          widget_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
