@@ -158,6 +158,14 @@ serve(async (req) => {
 
   socket.onopen = () => {
     console.log('Twilio WebSocket connection opened for call:', callSid);
+    // Send start message to indicate we're ready to receive media
+    const startMessage = {
+      event: 'start',
+      start: {
+        streamSid: callSid
+      }
+    };
+    socket.send(JSON.stringify(startMessage));
     initializeRealtimeSession(socket, { callSid, from, to });
   };
 
@@ -188,8 +196,10 @@ async function initializeRealtimeSession(twilioSocket: WebSocket, params: { call
     const phoneFormats = [
       to,
       to.replace(/\D/g, ''),
+      `(${to.slice(2, 5)}) ${to.slice(5, 8)}-${to.slice(8)}`,
       `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`,
-      `+${to.slice(1, 2)} ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`
+      `${to.slice(2, 5)}-${to.slice(5, 8)}-${to.slice(8)}`,
+      `${to.slice(2, 5)}.${to.slice(5, 8)}.${to.slice(8)}`
     ];
 
     const { data: twilioIntegration, error: twilioError } = await supabase
@@ -263,11 +273,22 @@ async function initializeRealtimeSession(twilioSocket: WebSocket, params: { call
     console.log('Connecting to OpenAI Realtime API...');
 
     openAISocket.onopen = () => {
-      console.log('OpenAI WebSocket connection opened');
+      console.log('OpenAI WebSocket connection opened for call:', callSid);
       
-      // Configure session after connection
-      const voiceSettings = twilioIntegration.voice_settings || { voice: 'alloy' };
-      const systemPrompt = agent.system_prompt || `You are a helpful AI customer service agent conducting a phone conversation. 
+      // Wait for session.created event before configuring
+    };
+
+    openAISocket.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('OpenAI message type:', data.type);
+
+        if (data.type === 'session.created') {
+          console.log('OpenAI session created, sending configuration...');
+          
+          // Configure session after connection
+          const voiceSettings = twilioIntegration.voice_settings || { voice: 'alloy' };
+          const systemPrompt = agent.system_prompt || `You are a helpful AI customer service agent conducting a phone conversation. 
 
 Guidelines:
 - Keep responses natural and conversational for voice
@@ -279,61 +300,67 @@ Guidelines:
 
 You are speaking directly with a customer over the phone right now.`;
 
-      // Get welcome message
-      let welcomeMessage = "Hello! How can I help you today?";
-      if (voiceSettings.welcome_message) {
-        welcomeMessage = voiceSettings.welcome_message;
-      } else if (agent.settings?.welcome_message) {
-        welcomeMessage = agent.settings.welcome_message;
-      } else if (agent.name) {
-        welcomeMessage = `Hello! I'm ${agent.name}. How can I help you today?`;
-      }
-
-      const sessionConfig = {
-        type: 'session.update',
-        session: {
-          modalities: ['text', 'audio'],
-          instructions: systemPrompt,
-          voice: voiceSettings.voice || 'alloy',
-          input_audio_format: 'pcm16',
-          output_audio_format: 'pcm16',
-          input_audio_transcription: {
-            model: 'whisper-1'
-          },
-          turn_detection: {
-            type: 'server_vad',
-            threshold: 0.5,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 1000
-          },
-          temperature: 0.8,
-          max_response_output_tokens: 1000
-        }
-      };
-
-      console.log('Sending session configuration to OpenAI');
-      openAISocket.send(JSON.stringify(sessionConfig));
-
-      // Send initial greeting
-      setTimeout(() => {
-        const greetingEvent = {
-          type: 'conversation.item.create',
-          item: {
-            type: 'message',
-            role: 'assistant',
-            content: [
-              {
-                type: 'input_text',
-                text: welcomeMessage
-              }
-            ]
+          // Get welcome message
+          let welcomeMessage = "Hello! How can I help you today?";
+          if (voiceSettings.welcome_message) {
+            welcomeMessage = voiceSettings.welcome_message;
+          } else if (agent.settings?.welcome_message) {
+            welcomeMessage = agent.settings.welcome_message;
+          } else if (agent.name) {
+            welcomeMessage = `Hello! I'm ${agent.name}. How can I help you today?`;
           }
-        };
-        
-        openAISocket.send(JSON.stringify(greetingEvent));
-        openAISocket.send(JSON.stringify({ type: 'response.create' }));
-        console.log('Sent initial greeting to OpenAI');
-      }, 100);
+
+          const sessionConfig = {
+            type: 'session.update',
+            session: {
+              modalities: ['text', 'audio'],
+              instructions: systemPrompt,
+              voice: voiceSettings.voice || 'alloy',
+              input_audio_format: 'pcm16',
+              output_audio_format: 'pcm16',
+              input_audio_transcription: {
+                model: 'whisper-1'
+              },
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 1000
+              },
+              temperature: 0.8,
+              max_response_output_tokens: 1000
+            }
+          };
+
+          console.log('Sending session configuration to OpenAI');
+          openAISocket.send(JSON.stringify(sessionConfig));
+
+          // Send initial greeting
+          setTimeout(() => {
+            const greetingEvent = {
+              type: 'conversation.item.create',
+              item: {
+                type: 'message',
+                role: 'assistant',
+                content: [
+                  {
+                    type: 'input_text',
+                    text: welcomeMessage
+                  }
+                ]
+              }
+            };
+            
+            openAISocket.send(JSON.stringify(greetingEvent));
+            openAISocket.send(JSON.stringify({ type: 'response.create' }));
+            console.log('Sent initial greeting to OpenAI');
+          }, 100);
+        } else {
+          handleOpenAIMessage(event, callSid);
+        }
+      } catch (error) {
+        console.error('Error processing OpenAI message:', error);
+      }
     };
 
     openAISocket.onmessage = (event) => {

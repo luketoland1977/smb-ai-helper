@@ -108,7 +108,7 @@ serve(async (req) => {
         console.log('Using real-time voice interface for call:', callSid);
         
         // Start real-time voice stream
-        const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${callSid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+        const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
         
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -464,7 +464,8 @@ Please use this information to provide accurate, helpful responses. Keep respons
           metadata: { channel: 'voice', call_sid: callSid }
         });
 
-      // Use voice settings already declared above
+      // Get voice settings from the integration (redeclare for process action)
+      const voiceSettings = twilioIntegration.voice_settings || { voice: 'alice', language: 'en-US' };
       const voice = voiceSettings.voice || 'alice';
       
       console.log('Using voice settings:', voiceSettings);
