@@ -15,6 +15,7 @@ serve(async (req) => {
   console.log('=== TWILIO VOICE WEBHOOK CALLED ===');
   console.log('Method:', req.method);
   console.log('URL:', req.url);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -23,70 +24,24 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action') || 'incoming';
-    console.log('=== WEBHOOK PROCESSING START ===');
-    console.log('Action parameter:', action);
-
-    if (action === 'incoming') {
-      console.log('Processing incoming call...');
-      
-      // Parse form data from Twilio webhook
-      const formData = await req.formData();
-      const from = formData.get('From') as string;
-      const to = formData.get('To') as string;
-      const callSid = formData.get('CallSid') as string;
-
-      console.log('=== CALL DETAILS ===');
-      console.log('From:', from);
-      console.log('To:', to);  
-      console.log('CallSid:', callSid);
-
-      if (!from || !to || !callSid) {
-        console.error('Missing required parameters:', { from, to, callSid });
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Say voice="alice">I'm sorry, there was an error with the call parameters. Please try again.</Say>
-</Response>`;
-        return new Response(twiml, {
-          headers: { 'Content-Type': 'text/xml' },
-        });
-      }
-
-      // Direct connection to real-time voice stream (simplified for now)
-      console.log('=== GENERATING WEBSOCKET URL ===');
-      const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.functions.supabase.co/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-      console.log('WebSocket URL:', realtimeUrl);
-      
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Connect>
-        <Stream url="${realtimeUrl}" />
-    </Connect>
-</Response>`;
-
-      console.log('=== TWIML GENERATED ===');
-      console.log('Returning TwiML response');
-      return new Response(twiml, {
-        headers: { 'Content-Type': 'text/xml' },
-      });
-    }
-
-    // All other actions redirect to real-time
+    console.log('=== PROCESSING REQUEST ===');
+    
+    // For now, return a simple TwiML response to test
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">This service now uses real-time voice. Please hang up and call again.</Say>
+    <Say voice="alice">Hello! This is a test of the PRO WEB SUPPORT voice system. The connection is working.</Say>
 </Response>`;
-
+    
+    console.log('=== RETURNING SIMPLE TWIML ===');
     return new Response(twiml, {
       headers: { 'Content-Type': 'text/xml' },
     });
 
   } catch (error) {
-    console.error('Error in Twilio voice webhook:', error);
+    console.error('=== ERROR IN WEBHOOK ===', error);
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">I'm sorry, there was an error processing your call. Please try again later. Goodbye!</Say>
+    <Say voice="alice">I'm sorry, there was an error processing your call. Please try again later.</Say>
 </Response>`;
 
     return new Response(twiml, {
