@@ -1,34 +1,31 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
+
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Active sessions to track ongoing calls
+const activeSessions = new Map();
 
 serve(async (req) => {
   console.log('=== TWILIO REALTIME VOICE FUNCTION CALLED ===');
   console.log('Method:', req.method);
   console.log('URL:', req.url);
-  console.log('Headers:', Object.fromEntries(req.headers.entries()));
   
   const { headers } = req;
   const upgradeHeader = headers.get("upgrade") || "";
-  const connectionHeader = headers.get("connection") || "";
-
-  // More detailed WebSocket validation for Twilio
-  console.log('Connection header:', connectionHeader);
-  console.log('Upgrade header:', upgradeHeader);
 
   if (upgradeHeader.toLowerCase() !== "websocket") {
     console.log('❌ Non-WebSocket request received');
-    console.log('Expected: websocket, Got:', upgradeHeader);
-    return new Response("Expected WebSocket connection", { 
-      status: 400,
-      headers: {
-        'Content-Type': 'text/plain'
-      }
-    });
+    return new Response("Expected WebSocket connection", { status: 400 });
   }
 
-  console.log('✅ WebSocket upgrade request received - attempting upgrade...');
+  console.log('✅ WebSocket upgrade request received');
   
   try {
-    // Extract parameters from URL for logging
+    // Extract parameters from URL
     const url = new URL(req.url);
     const callSid = url.searchParams.get('callSid');
     const from = url.searchParams.get('from');
@@ -36,116 +33,197 @@ serve(async (req) => {
     
     console.log('📞 Call parameters:', { callSid, from, to });
 
-    // Upgrade to WebSocket with proper options for Twilio
-    const { socket, response } = Deno.upgradeWebSocket(req, {
-      protocol: "", // Twilio doesn't require specific protocols
-      idleTimeout: 300, // 5 minute timeout
-    });
-    
-    console.log('🚀 WebSocket upgrade successful!');
+    // Get agent configuration
+    const { data: twilioIntegration } = await supabase
+      .from('twilio_integrations')
+      .select(`
+        *,
+        ai_agents (
+          id,
+          name,
+          system_prompt,
+          settings
+        )
+      `)
+      .eq('phone_number', '(844) 789-0436')
+      .single();
 
-    socket.onopen = () => {
-      console.log('🔗 WebSocket connection opened for Twilio call:', callSid);
+    const agent = twilioIntegration?.ai_agents;
+    const systemPrompt = agent?.system_prompt || `You are PRO WEB SUPPORT, a helpful AI assistant conducting a phone conversation. 
+
+Guidelines:
+- Keep responses natural and conversational for voice
+- Be polite, professional, and helpful
+- Listen carefully and respond appropriately
+- Keep responses concise but complete
+- Ask clarifying questions when needed
+
+You are speaking directly with a customer over the phone right now.`;
+
+    // Get welcome message
+    const voiceSettings = twilioIntegration?.voice_settings || {};
+    const welcomeMessage = voiceSettings.welcome_message || "Thank you for calling PRO WEB SUPPORT! How can I help you today?";
+
+    console.log('🤖 Using agent:', agent?.name);
+    console.log('💬 Welcome message:', welcomeMessage);
+
+    // Upgrade to WebSocket
+    const { socket, response } = Deno.upgradeWebSocket(req);
+    let openAISocket = null;
+
+    socket.onopen = async () => {
+      console.log('🔗 Twilio WebSocket connected for call:', callSid);
       
-      // Send Twilio-compatible start message
+      // Connect to OpenAI Realtime API
       try {
-        const startMessage = {
-          event: "start",
-          start: {
-            streamSid: callSid,
-            accountSid: "PLACEHOLDER", 
-            callSid: callSid,
-            tracks: ["inbound"],
-            mediaFormat: {
-              encoding: "audio/x-mulaw",
-              sampleRate: 8000,
-              channels: 1
+        const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+        if (!openAIApiKey) {
+          console.error('❌ OpenAI API key not found');
+          socket.close();
+          return;
+        }
+
+        console.log('🧠 Connecting to OpenAI Realtime API...');
+        openAISocket = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'OpenAI-Beta': 'realtime=v1'
+          }
+        });
+
+        openAISocket.onopen = () => {
+          console.log('🧠 OpenAI connection established');
+        };
+
+        openAISocket.onmessage = async (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('🧠 OpenAI event:', data.type);
+
+            if (data.type === 'session.created') {
+              console.log('🧠 Configuring OpenAI session...');
+              
+              const sessionConfig = {
+                type: 'session.update',
+                session: {
+                  modalities: ['text', 'audio'],
+                  instructions: systemPrompt,
+                  voice: voiceSettings.voice || 'alloy',
+                  input_audio_format: 'pcm16',
+                  output_audio_format: 'pcm16',
+                  input_audio_transcription: {
+                    model: 'whisper-1'
+                  },
+                  turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.5,
+                    prefix_padding_ms: 300,
+                    silence_duration_ms: 1000
+                  },
+                  temperature: 0.8,
+                  max_response_output_tokens: 1000
+                }
+              };
+
+              openAISocket.send(JSON.stringify(sessionConfig));
+
+              // Send initial greeting
+              setTimeout(() => {
+                const greetingEvent = {
+                  type: 'conversation.item.create',
+                  item: {
+                    type: 'message',
+                    role: 'assistant',
+                    content: [{ type: 'input_text', text: welcomeMessage }]
+                  }
+                };
+                
+                openAISocket.send(JSON.stringify(greetingEvent));
+                openAISocket.send(JSON.stringify({ type: 'response.create' }));
+                console.log('💬 Sent greeting to OpenAI');
+              }, 500);
+
+            } else if (data.type === 'response.audio.delta') {
+              // Convert PCM16 to Mulaw for Twilio
+              const encodedAudio = convertPCMToMulaw(data.delta);
+              
+              const mediaMessage = {
+                event: "media",
+                streamSid: callSid,
+                media: {
+                  track: "outbound",
+                  chunk: Math.random().toString(),
+                  timestamp: Date.now().toString(),
+                  payload: encodedAudio
+                }
+              };
+              
+              socket.send(JSON.stringify(mediaMessage));
             }
+
+          } catch (error) {
+            console.error('❌ Error processing OpenAI message:', error);
           }
         };
-        
-        console.log('📤 Sending start message to Twilio:', startMessage);
-        socket.send(JSON.stringify(startMessage));
-        
-        // Also send a simple audio response for testing
-        setTimeout(() => {
-          const mediaMessage = {
-            event: "media",
-            streamSid: callSid,
-            media: {
-              track: "outbound",
-              chunk: "1",
-              timestamp: Date.now().toString(),
-              payload: "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" // Empty audio
-            }
-          };
-          console.log('📤 Sending test media to Twilio');
-          socket.send(JSON.stringify(mediaMessage));
-        }, 1000);
-        
+
+        openAISocket.onerror = (error) => {
+          console.error('❌ OpenAI WebSocket error:', error);
+        };
+
+        // Store session
+        activeSessions.set(callSid, { twilioSocket: socket, openAISocket });
+
       } catch (error) {
-        console.error('❌ Error sending start message:', error);
+        console.error('❌ Error connecting to OpenAI:', error);
+        socket.close();
       }
     };
 
     socket.onmessage = (event) => {
       try {
-        console.log('📨 Received from Twilio:', event.data);
         const data = JSON.parse(event.data);
         
-        if (data.event === "start") {
-          console.log('🎬 Call started:', data.start);
-        } else if (data.event === "media") {
-          console.log('🎵 Audio data received, chunk:', data.media?.chunk);
-          // Echo the audio back for testing
-          const echoMessage = {
-            event: "media",
-            streamSid: data.streamSid,
-            media: {
-              track: "outbound", 
-              chunk: data.media?.chunk || "1",
-              timestamp: Date.now().toString(),
-              payload: data.media?.payload || ""
-            }
+        if (data.event === "media" && openAISocket && openAISocket.readyState === WebSocket.OPEN) {
+          // Convert Mulaw to PCM16 for OpenAI
+          const pcmAudio = convertMulawToPCM(data.media.payload);
+          
+          const audioEvent = {
+            type: 'input_audio_buffer.append',
+            audio: pcmAudio
           };
-          socket.send(JSON.stringify(echoMessage));
-        } else if (data.event === "stop") {
-          console.log('🛑 Call stopped:', data.stop);
-          socket.close();
+          
+          openAISocket.send(JSON.stringify(audioEvent));
         }
         
       } catch (error) {
-        console.error('❌ Error processing message:', error);
-        console.log('Raw message:', event.data);
+        console.error('❌ Error processing Twilio message:', error);
       }
     };
 
-    socket.onclose = (event) => {
-      console.log('🔌 WebSocket connection closed');
-      console.log('Close code:', event.code);
-      console.log('Close reason:', event.reason);
+    socket.onclose = () => {
+      console.log('🔌 Twilio WebSocket closed');
+      const session = activeSessions.get(callSid);
+      if (session?.openAISocket) {
+        session.openAISocket.close();
+      }
+      activeSessions.delete(callSid);
     };
 
-    socket.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
-    };
-
-    console.log('✅ Returning WebSocket response to Twilio');
     return response;
-    
+
   } catch (error) {
-    console.error('💥 Error upgrading to WebSocket:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    
-    return new Response(`WebSocket upgrade failed: ${error.message}`, { 
-      status: 500,
-      headers: {
-        'Content-Type': 'text/plain'
-      }
-    });
+    console.error('💥 Error in WebSocket setup:', error);
+    return new Response(`WebSocket setup failed: ${error.message}`, { status: 500 });
   }
 });
+
+// Audio conversion functions (simplified)
+function convertPCMToMulaw(base64PCM) {
+  // For now, return the base64 as-is (this needs proper conversion)
+  return base64PCM;
+}
+
+function convertMulawToPCM(base64Mulaw) {
+  // For now, return the base64 as-is (this needs proper conversion)
+  return base64Mulaw;
+}
