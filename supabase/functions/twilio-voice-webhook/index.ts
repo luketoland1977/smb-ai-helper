@@ -220,26 +220,34 @@ serve(async (req) => {
         .single();
 
       if (twilioError || !twilioIntegration) {
-        console.error('No Twilio integration found for number:', to);
-        console.error('Database error:', twilioError);
-        console.error('Searched formats:', phoneFormats);
+        console.error('ERROR: No Twilio integration found for number:', to);
+        console.error('Database error details:', twilioError);
+        console.error('Searched phone number formats:', phoneFormats);
         
         // Let's also check what integrations exist
         const { data: allIntegrations } = await supabase
           .from('twilio_integrations')
           .select('phone_number, is_active, voice_enabled')
           .eq('is_active', true);
-        console.log('Available integrations:', allIntegrations);
+        console.log('Available active integrations:', allIntegrations);
         
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">I'm sorry, our service is temporarily unavailable. Please try again later. Goodbye!</Say>
+    <Say voice="alice">I'm sorry, there is a technical difficulty with this service. Our team has been notified. Please try again later or contact support directly. Goodbye!</Say>
 </Response>`;
 
         return new Response(twiml, {
           headers: { 'Content-Type': 'text/xml' },
         });
       }
+
+      console.log('SUCCESS: Found Twilio integration:', {
+        id: twilioIntegration.id,
+        phone_number: twilioIntegration.phone_number,
+        client_id: twilioIntegration.client_id,
+        agent_id: twilioIntegration.agent_id,
+        voice_settings: twilioIntegration.voice_settings
+      });
 
       const clientId = twilioIntegration.client_id;
       const agentId = twilioIntegration.agent_id;
@@ -252,16 +260,24 @@ serve(async (req) => {
         .single();
 
       if (agentError || !agent) {
-        console.error('No agent found for ID:', agentId, agentError);
+        console.error('ERROR: No agent found for ID:', agentId);
+        console.error('Agent lookup error details:', agentError);
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">I'm sorry, no agent is configured for this number. Please contact support. Goodbye!</Say>
+    <Say voice="alice">I'm sorry, there is a technical difficulty with the agent configuration. Our team has been notified. Please contact support directly. Goodbye!</Say>
 </Response>`;
 
         return new Response(twiml, {
           headers: { 'Content-Type': 'text/xml' },
         });
       }
+
+      console.log('SUCCESS: Found agent:', {
+        id: agent.id,
+        name: agent.name,
+        status: agent.status,
+        has_system_prompt: !!agent.system_prompt
+      });
 
       // Note: voiceSettings already declared above, real-time logic handled there
 
