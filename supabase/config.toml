@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.twilio-realtime-voice]
 verify_jwt = false
+
+[functions.openai-realtime-token]
+verify_jwt = false
+
+[functions.voice-widget]
+verify_jwt = false
