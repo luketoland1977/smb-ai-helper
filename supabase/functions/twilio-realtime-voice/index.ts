@@ -498,6 +498,10 @@ async function handleOpenAIMessage(event: MessageEvent, callSid: string): Promis
       }
     } else if (data.type === 'error') {
       console.error('OpenAI API error for call:', callSid, data.error);
+      // Handle specific errors
+      if (data.error?.type === 'invalid_request_error') {
+        console.error('Invalid request to OpenAI:', data.error.message);
+      }
     }
 
   } catch (error) {
@@ -506,26 +510,14 @@ async function handleOpenAIMessage(event: MessageEvent, callSid: string): Promis
 }
 
 function cleanupSession(callSid: string): void {
-  console.log('Cleaning up session for call:', callSid);
-  
   const session = activeSessions.get(callSid);
   if (session) {
     try {
-      if (session.twilioSocket && session.twilioSocket.readyState === WebSocket.OPEN) {
-        session.twilioSocket.close();
-      }
+      session.openAISocket?.close();
+      session.twilioSocket?.close();
     } catch (error) {
-      console.error('Error closing Twilio socket:', error);
+      console.error('Error cleaning up session:', error);
     }
-
-    try {
-      if (session.openAISocket && session.openAISocket.readyState === WebSocket.OPEN) {
-        session.openAISocket.close();
-      }
-    } catch (error) {
-      console.error('Error closing OpenAI socket:', error);
-    }
-
     activeSessions.delete(callSid);
     console.log('Session cleaned up for call:', callSid);
   }
