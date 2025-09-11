@@ -77,7 +77,7 @@ serve(async (req) => {
       console.log('Using real-time voice interface for call:', callSid);
       
       // Direct connection to real-time voice stream
-      const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      const realtimeUrl = `wss://ycvvuepfsebqpwmamqgg.functions.supabase.co/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
