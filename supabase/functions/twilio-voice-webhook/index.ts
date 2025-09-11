@@ -46,6 +46,8 @@ serve(async (req) => {
         `${to.slice(2, 5)}.${to.slice(5, 8)}.${to.slice(8)}` // 844.789.0436
       ];
 
+      console.log('Checking phone formats:', phoneFormats);
+
       const { data: twilioIntegration, error: twilioError } = await supabase
         .from('twilio_integrations')
         .select(`
@@ -61,6 +63,8 @@ serve(async (req) => {
         .eq('is_active', true)
         .eq('voice_enabled', true)
         .single();
+
+      console.log('Twilio integration query result:', { twilioIntegration, twilioError });
 
       if (twilioError || !twilioIntegration) {
         console.error('No Twilio integration found:', twilioError);
