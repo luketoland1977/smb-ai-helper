@@ -77,10 +77,12 @@ serve(async (req) => {
     if (action === 'incoming') {
       // Check if real-time voice is enabled for this agent
       const phoneFormats = [
-        to,
-        to.replace(/\D/g, ''),
-        `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`,
-        `+${to.slice(1, 2)} ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`
+        to, // Original format (+18447890436)
+        to.replace(/\D/g, ''), // Just digits (18447890436)
+        `(${to.slice(2, 5)}) ${to.slice(5, 8)}-${to.slice(8)}`, // (844) 789-0436
+        `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`, // +1 844 789 0436
+        `${to.slice(2, 5)}-${to.slice(5, 8)}-${to.slice(8)}`, // 844-789-0436
+        `${to.slice(2, 5)}.${to.slice(5, 8)}.${to.slice(8)}` // 844.789.0436
       ];
 
       const { data: twilioIntegration } = await supabase
@@ -199,10 +201,12 @@ serve(async (req) => {
       
       // Try multiple phone number formats
       const phoneFormats = [
-        to, // Original format
-        to.replace(/\D/g, ''), // Just digits
-        `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`, // +1 XXX XXX XXXX format
-        `+${to.slice(1, 2)} ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}` // +X XXX XXX XXXX format
+        to, // Original format (+18447890436)
+        to.replace(/\D/g, ''), // Just digits (18447890436)
+        `(${to.slice(2, 5)}) ${to.slice(5, 8)}-${to.slice(8)}`, // (844) 789-0436
+        `+1 ${to.slice(2, 5)} ${to.slice(5, 8)} ${to.slice(8)}`, // +1 844 789 0436
+        `${to.slice(2, 5)}-${to.slice(5, 8)}-${to.slice(8)}`, // 844-789-0436
+        `${to.slice(2, 5)}.${to.slice(5, 8)}.${to.slice(8)}` // 844.789.0436
       ];
       
       console.log('Trying phone number formats:', phoneFormats);
