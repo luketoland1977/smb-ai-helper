@@ -152,7 +152,7 @@ serve(async (req) => {
             console.log('🧠 OpenAI message:', data.type);
             
             if (data.type === 'session.created') {
-              console.log('🧠 Configuring session...');
+              console.log('🧠 Session created, configuring...');
               
               const config = {
                 type: 'session.update',
@@ -174,27 +174,28 @@ serve(async (req) => {
               };
               
               openAISocket.send(JSON.stringify(config));
+              console.log('🧠 Session configuration sent');
               
-              // Send greeting after session is configured
-              setTimeout(() => {
-                if (openAISocket?.readyState === WebSocket.OPEN) {
-                  const greeting = {
-                    type: 'conversation.item.create',
-                    item: {
-                      type: 'message',
-                      role: 'assistant',
-                      content: [{ type: 'input_text', text: welcomeMessage }]
-                    }
-                  };
-                  
-                  openAISocket.send(JSON.stringify(greeting));
-                  openAISocket.send(JSON.stringify({ type: 'response.create' }));
-                  isOpenAIReady = true;
-                  console.log('💬 Sent greeting and response request');
+            } else if (data.type === 'session.updated') {
+              console.log('🧠 Session updated, sending greeting...');
+              
+              // Send greeting now that session is updated
+              const greeting = {
+                type: 'conversation.item.create',
+                item: {
+                  type: 'message',
+                  role: 'assistant',
+                  content: [{ type: 'input_text', text: welcomeMessage }]
                 }
-              }, 1000);
+              };
+              
+              openAISocket.send(JSON.stringify(greeting));
+              openAISocket.send(JSON.stringify({ type: 'response.create' }));
+              isOpenAIReady = true;
+              console.log('💬 Greeting sent and ready for conversation');
               
             } else if (data.type === 'response.audio.delta' && socket.readyState === WebSocket.OPEN) {
+              console.log('🔊 Sending audio chunk to Twilio');
               // Convert OpenAI PCM16 to mulaw for Twilio
               const pcm16Data = new Uint8Array(atob(data.delta).split('').map(c => c.charCodeAt(0)));
               const mulawData = pcm16ToMulaw(pcm16Data);
@@ -212,6 +213,15 @@ serve(async (req) => {
               };
               
               socket.send(JSON.stringify(mediaMsg));
+              
+            } else if (data.type === 'response.audio_transcript.delta') {
+              console.log('📝 Transcript:', data.delta);
+              
+            } else if (data.type === 'input_audio_buffer.speech_started') {
+              console.log('🎤 User started speaking');
+              
+            } else if (data.type === 'input_audio_buffer.speech_stopped') {
+              console.log('🎤 User stopped speaking');
             }
             
           } catch (error) {
@@ -244,17 +254,23 @@ serve(async (req) => {
         } else if (data.event === "media") {
           // Forward audio to OpenAI if ready
           if (openAISocket?.readyState === WebSocket.OPEN && isOpenAIReady) {
-            // Convert Twilio mulaw to PCM16 for OpenAI
-            const mulawData = new Uint8Array(atob(data.media.payload).split('').map(c => c.charCodeAt(0)));
-            const pcm16Data = mulawToPcm16(mulawData);
-            const base64Pcm16 = btoa(String.fromCharCode(...pcm16Data));
-            
-            const audioEvent = {
-              type: 'input_audio_buffer.append',
-              audio: base64Pcm16
-            };
-            
-            openAISocket.send(JSON.stringify(audioEvent));
+            try {
+              // Convert Twilio mulaw to PCM16 for OpenAI
+              const mulawData = new Uint8Array(atob(data.media.payload).split('').map(c => c.charCodeAt(0)));
+              const pcm16Data = mulawToPcm16(mulawData);
+              const base64Pcm16 = btoa(String.fromCharCode(...pcm16Data));
+              
+              const audioEvent = {
+                type: 'input_audio_buffer.append',
+                audio: base64Pcm16
+              };
+              
+              openAISocket.send(JSON.stringify(audioEvent));
+            } catch (error) {
+              console.error('❌ Audio conversion error:', error);
+            }
+          } else {
+            console.log('⚠️ OpenAI not ready, dropping audio chunk');
           }
           
         } else if (data.event === "stop") {
