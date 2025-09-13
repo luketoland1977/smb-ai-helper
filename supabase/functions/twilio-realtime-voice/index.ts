@@ -132,72 +132,63 @@ serve(async (req) => {
           return;
         }
 
-        console.log('🧠 Connecting to OpenAI realtime API...');
+        console.log('🧠 Creating ephemeral token for OpenAI...');
         
-        // Use standard WebSocket URL and handle auth via connection upgrade
-        // This approach works better with Deno's WebSocket implementation
-        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
-        console.log('🔗 Creating WebSocket connection...');
-        
-        try {
-          // Create WebSocket with proper error handling
-          openAISocket = new WebSocket(wsUrl);
-          
-          openAISocket.onopen = () => {
-            console.log('🧠 OpenAI WebSocket connected!');
-            
-            // Immediately send session configuration with proper format
-            const sessionUpdate = {
-              type: 'session.update',
-              session: {
-                modalities: ['text', 'audio'],
-                instructions: systemPrompt,
-                voice: 'alloy',
-                input_audio_format: 'pcm16',
-                output_audio_format: 'pcm16',
-                input_audio_transcription: { model: 'whisper-1' },
-                turn_detection: {
-                  type: 'server_vad',
-                  threshold: 0.5,
-                  prefix_padding_ms: 300,
-                  silence_duration_ms: 1000
-                },
-                temperature: 0.8,
-                max_response_output_tokens: 4096
-              }
-            };
-            
-            try {
-              openAISocket.send(JSON.stringify(sessionUpdate));
-              console.log('⚙️ Session configuration sent');
-              
-              // Mark as ready after sending configuration
-              isOpenAIReady = true;
-              console.log('✅ OpenAI marked as ready');
-              
-              // Send welcome message
-              const greetingResponse = {
-                type: 'response.create',
-                response: {
-                  modalities: ['audio'],
-                  instructions: `Say this welcome message: "${welcomeMessage}"`
-                }
-              };
-              
-              openAISocket.send(JSON.stringify(greetingResponse));
-              console.log('🎙️ Welcome message sent');
-              
-            } catch (sendError) {
-              console.error('❌ Error sending initial messages:', sendError);
-              isOpenAIReady = false;
-            }
-          };
-          
-        } catch (wsError) {
-          console.error('❌ Error creating WebSocket:', wsError);
+        // Create ephemeral token for WebSocket authentication
+        const tokenResponse = await fetch('https://api.openai.com/v1/realtime/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-realtime-preview-2024-12-17',
+            voice: 'alloy',
+            instructions: systemPrompt
+          }),
+        });
+
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          console.error('❌ Failed to create ephemeral token:', tokenResponse.status, errorText);
           socket.close();
           return;
         }
+
+        const tokenData = await tokenResponse.json();
+        console.log('✅ Ephemeral token created');
+
+        if (!tokenData.client_secret?.value) {
+          console.error('❌ No client secret in token response');
+          socket.close();
+          return;
+        }
+
+        const ephemeralToken = tokenData.client_secret.value;
+        console.log('🔗 Connecting to OpenAI with ephemeral token...');
+
+        // Connect using ephemeral token
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
+        
+        openAISocket = new WebSocket(wsUrl, [`realtime`, `Authorization.Bearer.${ephemeralToken}`]);
+        
+        openAISocket.onopen = () => {
+          console.log('🧠 OpenAI WebSocket connected!');
+          isOpenAIReady = true;
+          console.log('✅ OpenAI marked as ready');
+          
+          // Send welcome message
+          const greetingResponse = {
+            type: 'response.create',
+            response: {
+              modalities: ['audio'],
+              instructions: `Say this welcome message: "${welcomeMessage}"`
+            }
+          };
+          
+          openAISocket.send(JSON.stringify(greetingResponse));
+          console.log('🎙️ Welcome message sent');
+        };
 
         openAISocket.onmessage = (event) => {
           try {
