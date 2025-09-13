@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { LogOut } from 'lucide-react';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -15,6 +17,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   const roleOptions = [
     { value: 'salesperson', label: 'Salesperson', description: 'Manage clients and agents' },
@@ -175,10 +178,25 @@ const Auth = () => {
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Admin Access</CardTitle>
-          <CardDescription>
-            Sign in to access the AI Service Pro admin dashboard
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <CardTitle className="text-2xl font-bold">Admin Access</CardTitle>
+              <CardDescription>
+                {user ? `Signed in as ${user.email}` : "Sign in to access the AI Service Pro admin dashboard"}
+              </CardDescription>
+            </div>
+            {user && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={signOut}
+                className="ml-4"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
