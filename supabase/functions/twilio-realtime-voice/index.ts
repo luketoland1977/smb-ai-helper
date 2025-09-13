@@ -121,6 +121,7 @@ serve(async (req) => {
     
     let openAISocket = null;
     let isOpenAIReady = false;
+    let audioBuffer = []; // Buffer audio chunks while waiting for OpenAI
 
     socket.onopen = async () => {
       console.log('🔗 Twilio WebSocket connected');
@@ -175,8 +176,40 @@ serve(async (req) => {
         
         openAISocket.onopen = () => {
           console.log('🧠 OpenAI WebSocket connected!');
+          
+          // Configure session first
+          const sessionConfig = {
+            type: 'session.update',
+            session: {
+              modalities: ['audio'],
+              instructions: `Use prompt ID: ${promptId}. This is a voice call for PRO WEB SUPPORT.`,
+              voice: 'alloy',
+              input_audio_format: 'pcm16',
+              output_audio_format: 'pcm16',
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 1000
+              }
+            }
+          };
+          
+          openAISocket.send(JSON.stringify(sessionConfig));
+          console.log('⚙️ Session configuration sent');
+          
+          // Mark as ready and process buffered audio
           isOpenAIReady = true;
           console.log('✅ OpenAI marked as ready');
+          
+          // Process any buffered audio chunks
+          if (audioBuffer.length > 0) {
+            console.log(`📥 Processing ${audioBuffer.length} buffered audio chunks`);
+            audioBuffer.forEach(audioEvent => {
+              openAISocket.send(JSON.stringify(audioEvent));
+            });
+            audioBuffer = [];
+          }
           
           // Send welcome message
           const greetingResponse = {
@@ -256,11 +289,10 @@ serve(async (req) => {
         if (data.event === "start") {
           console.log('🎬 Call started');
           
-        } else if (data.event === "media" && isOpenAIReady) {
-          // Forward audio to OpenAI
-          if (openAISocket?.readyState === WebSocket.OPEN) {
+        } else if (data.event === "media") {
+          if (isOpenAIReady && openAISocket?.readyState === WebSocket.OPEN) {
+            // Forward audio to OpenAI immediately
             try {
-              // Convert Twilio mulaw to PCM16 for OpenAI
               const mulawData = new Uint8Array(atob(data.media.payload).split('').map(c => c.charCodeAt(0)));
               const pcm16Data = mulawToPcm16(mulawData);
               const base64Pcm16 = btoa(String.fromCharCode(...pcm16Data));
@@ -274,10 +306,31 @@ serve(async (req) => {
             } catch (error) {
               console.error('❌ Audio conversion error:', error);
             }
+          } else {
+            // Buffer audio while waiting for OpenAI
+            console.log('📦 Buffering audio chunk (OpenAI not ready)');
+            try {
+              const mulawData = new Uint8Array(atob(data.media.payload).split('').map(c => c.charCodeAt(0)));
+              const pcm16Data = mulawToPcm16(mulawData);
+              const base64Pcm16 = btoa(String.fromCharCode(...pcm16Data));
+              
+              const audioEvent = {
+                type: 'input_audio_buffer.append',
+                audio: base64Pcm16
+              };
+              
+              // Limit buffer size to prevent memory issues
+              if (audioBuffer.length < 50) {
+                audioBuffer.push(audioEvent);
+              } else {
+                console.log('⚠️ Audio buffer full, dropping oldest chunks');
+                audioBuffer.shift();
+                audioBuffer.push(audioEvent);
+              }
+            } catch (error) {
+              console.error('❌ Audio buffering error:', error);
+            }
           }
-          
-        } else if (data.event === "media" && !isOpenAIReady) {
-          console.log('⚠️ OpenAI not ready, dropping audio chunk');
           
         } else if (data.event === "stop") {
           console.log('🛑 Call ended');
