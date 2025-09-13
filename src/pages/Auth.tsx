@@ -11,9 +11,16 @@ import { useNavigate } from 'react-router-dom';
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'salesperson' | 'support' | 'admin'>('salesperson');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const roleOptions = [
+    { value: 'salesperson', label: 'Salesperson', description: 'Manage clients and agents' },
+    { value: 'support', label: 'Support', description: 'Handle customer support and knowledge base' },
+    { value: 'admin', label: 'Administrator', description: 'Full system access (requires approval)' }
+  ] as const;
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +53,10 @@ const Auth = () => {
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl
+        emailRedirectTo: redirectUrl,
+        data: {
+          requested_role: selectedRole
+        }
       }
     });
 
@@ -77,7 +87,9 @@ const Auth = () => {
       // User is immediately signed in (email confirmation disabled)
       toast({
         title: "Success",
-        description: "Account created successfully! Redirecting...",
+        description: selectedRole === 'admin' 
+          ? "Account created! Admin access requires approval." 
+          : "Account created successfully! Redirecting...",
       });
       navigate('/dashboard');
     } else if (data.user && !data.session) {
@@ -225,6 +237,24 @@ const Auth = () => {
                     required
                     minLength={6}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role-select">Role</Label>
+                  <select 
+                    id="role-select"
+                    value={selectedRole} 
+                    onChange={(e) => setSelectedRole(e.target.value as typeof selectedRole)}
+                    className="w-full p-2 border border-input bg-background rounded-md text-sm"
+                  >
+                    {roleOptions.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    {roleOptions.find(r => r.value === selectedRole)?.description}
+                  </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Creating account...' : 'Create Account'}
