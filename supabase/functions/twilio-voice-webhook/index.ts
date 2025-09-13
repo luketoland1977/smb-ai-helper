@@ -47,7 +47,7 @@ serve(async (req) => {
 <Response>
     <Say voice="alice">Hello! This is PRO WEB SUPPORT. Connecting you now.</Say>
     <Connect>
-        <Stream url="wss://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&amp;from=${encodeURIComponent(from)}&amp;to=${encodeURIComponent(to)}" />
+        <Stream url="wss://ycvvuepfsebqpwmamqgg.functions.supabase.co/functions/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&amp;from=${encodeURIComponent(from)}&amp;to=${encodeURIComponent(to)}" />
     </Connect>
 </Response>`;
 
