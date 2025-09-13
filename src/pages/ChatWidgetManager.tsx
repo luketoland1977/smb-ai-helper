@@ -197,6 +197,13 @@ const ChatWidgetManager = () => {
 <script src="${baseUrl}/voice-widget.js"></script>`;
   };
 
+  const generateWebhookUrls = () => {
+    return {
+      voice: 'https://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-voice-webhook',
+      sms: 'https://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-sms-webhook'
+    };
+  };
+
   const handleCreateWidget = async () => {
     if (!formData.client_id || !formData.agent_id || !formData.widget_name) {
       toast({
@@ -996,6 +1003,37 @@ const ChatWidgetManager = () => {
                     />
                   </div>
 
+                  <div className="border-t pt-4">
+                    <div className="mb-3">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        📞 Webhook Setup Required
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        After creating this integration, you'll need to configure these webhook URLs in your Twilio Console:
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3 bg-muted p-4 rounded-lg">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Voice Webhook URL:</label>
+                        <div className="mt-1 p-2 bg-background border rounded font-mono text-xs">
+                          {generateWebhookUrls().voice}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">SMS Webhook URL:</label>
+                        <div className="mt-1 p-2 bg-background border rounded font-mono text-xs">
+                          {generateWebhookUrls().sms}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground mt-2">
+                      💡 Go to: Twilio Console → Phone Numbers → Manage → Active Numbers → Select your number → Configure webhooks
+                    </p>
+                  </div>
+
                   <div className="flex gap-2">
                     <Button onClick={createTwilioIntegration}>
                       Create Integration
@@ -1051,36 +1089,91 @@ const ChatWidgetManager = () => {
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p><strong>SMS:</strong> {integration.sms_enabled ? 'Enabled' : 'Disabled'}</p>
-                            <p><strong>Voice:</strong> {integration.voice_enabled ? 'Enabled' : 'Disabled'}</p>
-                          </div>
-                          <div>
-                            <p><strong>Voice:</strong> {integration.voice_settings?.voice || 'alice'}</p>
-                            <p><strong>Language:</strong> {integration.voice_settings?.language || 'en-US'}</p>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <h4 className="font-medium mb-2">Configuration</h4>
-                          <div className="bg-muted p-3 rounded text-sm">
-                            <p><strong>Account SID:</strong> {integration.account_sid}</p>
-                          </div>
-                        </div>
+                     <CardContent>
+                       <div className="space-y-4">
+                         <div className="grid grid-cols-2 gap-4 text-sm">
+                           <div>
+                             <p><strong>SMS:</strong> {integration.sms_enabled ? 'Enabled' : 'Disabled'}</p>
+                             <p><strong>Voice:</strong> {integration.voice_enabled ? 'Enabled' : 'Disabled'}</p>
+                           </div>
+                           <div>
+                             <p><strong>Voice:</strong> {integration.voice_settings?.voice || 'alice'}</p>
+                             <p><strong>Language:</strong> {integration.voice_settings?.language || 'en-US'}</p>
+                           </div>
+                         </div>
+                         
+                         <div>
+                           <h4 className="font-medium mb-2">Configuration</h4>
+                           <div className="bg-muted p-3 rounded text-sm">
+                             <p><strong>Account SID:</strong> {integration.account_sid}</p>
+                             <p><strong>Agent:</strong> {agents.find(a => a.id === integration.agent_id)?.name || 'Unknown Agent'}</p>
+                             <p><strong>Client:</strong> {clients.find(c => c.id === integration.client_id)?.name || 'Unknown Client'}</p>
+                           </div>
+                         </div>
 
-                        {integration.voice_settings?.welcome_message && (
-                          <div>
-                            <h4 className="font-medium mb-2">Welcome Message</h4>
-                            <div className="bg-muted p-3 rounded text-sm">
-                              <p>{integration.voice_settings.welcome_message}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
+                         {integration.voice_settings?.welcome_message && (
+                           <div>
+                             <h4 className="font-medium mb-2">Welcome Message</h4>
+                             <div className="bg-muted p-3 rounded text-sm">
+                               <p>{integration.voice_settings.welcome_message}</p>
+                             </div>
+                           </div>
+                         )}
+                         
+                         <div className="border-t pt-4">
+                           <h4 className="font-medium mb-2">Webhook Configuration</h4>
+                           <p className="text-xs text-muted-foreground mb-3">
+                             Copy these URLs and paste them in your Twilio Console under your phone number settings:
+                           </p>
+                           
+                           <div className="space-y-3">
+                             <div>
+                               <label className="text-xs font-medium text-muted-foreground">Voice Webhook URL:</label>
+                               <div className="flex gap-2 mt-1">
+                                 <input
+                                   type="text"
+                                   value={generateWebhookUrls().voice}
+                                   readOnly
+                                   className="flex-1 px-2 py-1 text-xs border rounded font-mono"
+                                 />
+                                 <Button
+                                   size="sm"
+                                   variant="outline"
+                                   onClick={() => copyToClipboard(generateWebhookUrls().voice)}
+                                   className="px-3"
+                                 >
+                                   <Copy className="h-3 w-3" />
+                                 </Button>
+                               </div>
+                             </div>
+                             
+                             <div>
+                               <label className="text-xs font-medium text-muted-foreground">SMS Webhook URL:</label>
+                               <div className="flex gap-2 mt-1">
+                                 <input
+                                   type="text"
+                                   value={generateWebhookUrls().sms}
+                                   readOnly
+                                   className="flex-1 px-2 py-1 text-xs border rounded font-mono"
+                                 />
+                                 <Button
+                                   size="sm"
+                                   variant="outline"
+                                   onClick={() => copyToClipboard(generateWebhookUrls().sms)}
+                                   className="px-3"
+                                 >
+                                   <Copy className="h-3 w-3" />
+                                 </Button>
+                               </div>
+                             </div>
+                           </div>
+                           
+                           <p className="text-xs text-muted-foreground mt-3">
+                             💡 In Twilio Console: Phone Numbers → Manage → Active Numbers → Select your number → Configure webhooks
+                           </p>
+                         </div>
+                       </div>
+                     </CardContent>
                   </Card>
                 ))
               )}
