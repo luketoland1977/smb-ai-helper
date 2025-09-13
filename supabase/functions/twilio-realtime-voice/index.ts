@@ -126,15 +126,16 @@ serve(async (req) => {
     socket.onopen = async () => {
       console.log('🔗 Twilio WebSocket connected successfully');
       
-      // Initialize OpenAI connection
+      // Initialize OpenAI connection IMMEDIATELY
       try {
         const apiKey = Deno.env.get('OPENAI_API_KEY');
         if (!apiKey) {
           console.error('❌ No OpenAI API key');
+          socket.close();
           return;
         }
 
-        console.log('🧠 Connecting to OpenAI...');
+        console.log('🧠 Connecting to OpenAI immediately...');
         openAISocket = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
@@ -177,22 +178,20 @@ serve(async (req) => {
               console.log('🧠 Session configuration sent');
               
             } else if (data.type === 'session.updated') {
-              console.log('🧠 Session updated, sending greeting...');
+              console.log('✅ OpenAI session configured and ready!');
+              isOpenAIReady = true;
               
-              // Send greeting now that session is updated
-              const greeting = {
-                type: 'conversation.item.create',
-                item: {
-                  type: 'message',
-                  role: 'assistant',
-                  content: [{ type: 'input_text', text: welcomeMessage }]
+              // Send greeting response to initiate conversation
+              const greetingResponse = {
+                type: 'response.create',
+                response: {
+                  modalities: ['audio'],
+                  instructions: `Say this welcome message: "${welcomeMessage}"`
                 }
               };
               
-              openAISocket.send(JSON.stringify(greeting));
-              openAISocket.send(JSON.stringify({ type: 'response.create' }));
-              isOpenAIReady = true;
-              console.log('💬 Greeting sent and ready for conversation');
+              openAISocket.send(JSON.stringify(greetingResponse));
+              console.log('🎙️ Welcome message initiated');
               
             } else if (data.type === 'response.audio.delta' && socket.readyState === WebSocket.OPEN) {
               console.log('🔊 Sending audio chunk to Twilio');
