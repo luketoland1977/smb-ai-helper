@@ -137,11 +137,19 @@ serve(async (req) => {
 
         console.log('🧠 Connecting to OpenAI immediately...');
         
-        // Use proper headers for authentication
-        const wsUrl = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17';
+        // Use proper URL-based authentication for Deno WebSocket
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
         console.log('🌐 Connecting to:', wsUrl);
         
-        openAISocket = new WebSocket(wsUrl, {
+        // Set a timeout for the connection
+        const connectionTimeout = setTimeout(() => {
+          console.error('❌ OpenAI connection timeout after 10 seconds');
+          if (openAISocket?.readyState === WebSocket.CONNECTING) {
+            openAISocket.close();
+          }
+        }, 10000);
+        
+        openAISocket = new WebSocket(wsUrl, [], {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'OpenAI-Beta': 'realtime=v1'
@@ -150,6 +158,19 @@ serve(async (req) => {
 
         openAISocket.onopen = () => {
           console.log('🧠 OpenAI connected successfully');
+          clearTimeout(connectionTimeout);
+        };
+
+        openAISocket.onerror = (error) => {
+          console.error('❌ OpenAI connection error:', error);
+          console.error('❌ OpenAI error details:', JSON.stringify(error));
+          clearTimeout(connectionTimeout);
+        };
+
+        openAISocket.onclose = (event) => {
+          console.log('🧠 OpenAI disconnected:', event.code, event.reason);
+          isOpenAIReady = false;
+          clearTimeout(connectionTimeout);
         };
 
         openAISocket.onmessage = (event) => {
@@ -234,11 +255,15 @@ serve(async (req) => {
         };
 
         openAISocket.onerror = (error) => {
-          console.error('❌ OpenAI error:', error);
+          console.error('❌ OpenAI WebSocket error:', error);
+          console.error('❌ Error type:', typeof error);
+          console.error('❌ Error message:', error.message || 'No message');
+          console.error('❌ Full error object:', JSON.stringify(error, null, 2));
         };
 
-        openAISocket.onclose = () => {
-          console.log('🧠 OpenAI disconnected');
+        openAISocket.onclose = (event) => {
+          console.log('🧠 OpenAI disconnected - Code:', event.code, 'Reason:', event.reason);
+          console.log('🧠 Was clean close:', event.wasClean);
           isOpenAIReady = false;
         };
 
