@@ -38,11 +38,10 @@ serve(async (req) => {
 
       console.log('📞 Call details:', { from, to, callSid });
 
-      // DIRECT CONNECTION TO WEBSOCKET - BYPASSING DATABASE FOR NOW
-      console.log('🚀 CONNECTING DIRECTLY TO WEBSOCKET (bypassing database)');
+      // Connect directly to OpenAI realtime voice WebSocket
+      console.log('🚀 Connecting to OpenAI realtime voice WebSocket');
       
-      // Let's try a simple voice response first to confirm webhook works
-      console.log('🎤 TESTING WITH SIMPLE VOICE RESPONSE FIRST');
+      // Return TwiML that connects to our realtime voice function
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
