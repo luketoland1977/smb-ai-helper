@@ -96,9 +96,9 @@ serve(async (req) => {
     
     console.log('📞 Call details:', { callSid, from, to });
 
-    // Get agent configuration
+    // Use OpenAI prompt ID instead of hardcoded prompt
+    let promptId = "pmpt_68c50f2852548197b42ccce02443ea1804c7524836544f5a";
     let welcomeMessage = "Hello! Thank you for calling PRO WEB SUPPORT. How can I help you today?";
-    let systemPrompt = "You are PRO WEB SUPPORT, a helpful AI assistant. Keep responses conversational and concise for voice calls.";
     
     try {
       const { data: integration } = await supabase
@@ -108,12 +108,13 @@ serve(async (req) => {
         .single();
 
       if (integration?.ai_agents) {
-        systemPrompt = integration.ai_agents.system_prompt || systemPrompt;
+        // Use prompt ID from OpenAI platform if available, otherwise use database prompt
+        promptId = integration.ai_agents.prompt_id || promptId;
         welcomeMessage = integration.voice_settings?.welcome_message || welcomeMessage;
-        console.log('✅ Loaded agent config');
+        console.log('✅ Loaded agent config with prompt ID:', promptId);
       }
     } catch (error) {
-      console.log('⚠️ Using default config:', error.message);
+      console.log('⚠️ Using default config with OpenAI prompt ID:', error.message);
     }
 
     const { socket, response } = Deno.upgradeWebSocket(req);
@@ -134,7 +135,7 @@ serve(async (req) => {
 
         console.log('🧠 Creating ephemeral token for OpenAI...');
         
-        // Create ephemeral token for WebSocket authentication
+        // Create ephemeral token with OpenAI prompt ID
         const tokenResponse = await fetch('https://api.openai.com/v1/realtime/sessions', {
           method: 'POST',
           headers: {
@@ -144,7 +145,7 @@ serve(async (req) => {
           body: JSON.stringify({
             model: 'gpt-4o-realtime-preview-2024-12-17',
             voice: 'alloy',
-            instructions: systemPrompt
+            instructions: `Use prompt ID: ${promptId}. This is a voice call for PRO WEB SUPPORT.`
           }),
         });
 
