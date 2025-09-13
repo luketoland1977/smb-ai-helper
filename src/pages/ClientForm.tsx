@@ -6,13 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 
 const ClientForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     domain: '',
@@ -103,6 +105,36 @@ const ClientForm = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!id) return;
+    
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Client deleted successfully",
+      });
+
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error('Error deleting client:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete client",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
@@ -174,21 +206,56 @@ const ClientForm = () => {
                 </p>
               </div>
 
-              <div className="flex gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/dashboard')}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading 
-                    ? (isEditing ? 'Updating...' : 'Creating...') 
-                    : (isEditing ? 'Update Client' : 'Create Client')
-                  }
-                </Button>
+              <div className="flex justify-between">
+                <div className="flex gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate('/dashboard')}
+                    disabled={loading || deleteLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading || deleteLoading}>
+                    {loading 
+                      ? (isEditing ? 'Updating...' : 'Creating...') 
+                      : (isEditing ? 'Update Client' : 'Create Client')
+                    }
+                  </Button>
+                </div>
+
+                {isEditing && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        type="button" 
+                        variant="destructive"
+                        disabled={loading || deleteLoading}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Client
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Client</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{formData.name}"? This will also delete all associated AI agents, chat sessions, and data. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDelete}
+                          disabled={deleteLoading}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {deleteLoading ? 'Deleting...' : 'Delete Client'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
             </form>
           </CardContent>
