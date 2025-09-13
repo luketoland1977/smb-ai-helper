@@ -132,59 +132,47 @@ serve(async (req) => {
           return;
         }
 
-        console.log('🧠 Creating OpenAI realtime session...');
+        console.log('🧠 Connecting directly to OpenAI realtime API...');
         
-        // Create ephemeral session directly
-        const sessionResponse = await fetch('https://api.openai.com/v1/realtime/sessions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-realtime-preview-2024-12-17',
-            voice: 'alloy',
-            instructions: systemPrompt,
-            modalities: ['text', 'audio'],
-            input_audio_format: 'pcm16',
-            output_audio_format: 'pcm16',
-            input_audio_transcription: { model: 'whisper-1' },
-            turn_detection: {
-              type: 'server_vad',
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 1000
-            },
-            temperature: 0.8
-          }),
-        });
-
-        if (!sessionResponse.ok) {
-          const errorText = await sessionResponse.text();
-          console.error('❌ Session creation failed:', sessionResponse.status, errorText);
-          throw new Error(`Failed to create session: ${sessionResponse.status} ${errorText}`);
-        }
-
-        const sessionData = await sessionResponse.json();
-        const ephemeralToken = sessionData.client_secret?.value;
-        
-        if (!ephemeralToken) {
-          console.error('❌ No ephemeral token in response:', JSON.stringify(sessionData));
-          throw new Error('No ephemeral token received');
-        }
-
-        console.log('✅ Got ephemeral token, connecting WebSocket...');
-        
-        // Now connect to WebSocket with ephemeral token
+        // Connect directly using API key in WebSocket subprotocol
+        // This is the most compatible approach for Deno
         const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
         
-        // Since Deno WebSocket doesn't support custom headers, we need to include auth in URL query
-        const authenticatedWsUrl = `${wsUrl}&authorization=${encodeURIComponent(`Bearer ${ephemeralToken}`)}`;
+        console.log('🔗 Attempting WebSocket connection to OpenAI...');
         
-        openAISocket = new WebSocket(authenticatedWsUrl);
+        // Use API key in subprotocol for Deno compatibility
+        openAISocket = new WebSocket(wsUrl, [
+          `Authorization.Bearer.${apiKey}`,
+          'realtime'
+        ]);
 
         openAISocket.onopen = () => {
           console.log('🧠 OpenAI WebSocket connected successfully!');
+          
+          // First, update session configuration
+          const sessionUpdate = {
+            type: 'session.update',
+            session: {
+              modalities: ['text', 'audio'],
+              instructions: systemPrompt,
+              voice: 'alloy',
+              input_audio_format: 'pcm16',
+              output_audio_format: 'pcm16',
+              input_audio_transcription: { model: 'whisper-1' },
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 1000
+              },
+              temperature: 0.8
+            }
+          };
+          
+          openAISocket.send(JSON.stringify(sessionUpdate));
+          console.log('⚙️ Session configuration sent');
+          
+          // Mark as ready
           isOpenAIReady = true;
           
           // Send welcome message
