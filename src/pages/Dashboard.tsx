@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Bot, MessageSquare, Settings } from 'lucide-react';
+import { Plus, Bot, MessageSquare, Settings, Users } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 
 interface Client {
@@ -29,6 +30,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
 
   useEffect(() => {
     loadData();

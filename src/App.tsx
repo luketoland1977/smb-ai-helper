@@ -14,6 +14,7 @@ import AgentForm from "./pages/AgentForm";
 import Chat from "./pages/Chat";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import ChatWidgetManager from "./pages/ChatWidgetManager";
+import RoleRequests from "./pages/RoleRequests";
 import NotFound from "./pages/NotFound";
 import WebSocketTest from "./components/WebSocketTest";
 
@@ -74,6 +75,14 @@ const App = () => (
               element={
                 <ProtectedRoute roles={['admin', 'salesperson']}>
                   <AgentForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/role-requests" 
+              element={
+                <ProtectedRoute roles={['admin']}>
+                  <RoleRequests />
                 </ProtectedRoute>
               } 
             />
