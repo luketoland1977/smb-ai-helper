@@ -132,24 +132,32 @@ serve(async (req) => {
           return;
         }
 
-        console.log('🧠 Connecting directly to OpenAI realtime API...');
+        console.log('🧠 Connecting to OpenAI realtime API...');
         
-        // Connect directly using API key in WebSocket subprotocol
-        // This is the most compatible approach for Deno
-        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
+        // Direct connection to OpenAI realtime WebSocket using URL parameters
+        // Based on Microsoft's Azure implementation pattern
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&api-key=${encodeURIComponent(apiKey)}`;
+        console.log('🔗 Creating WebSocket connection with API key in URL...');
         
-        console.log('🔗 Attempting WebSocket connection to OpenAI...');
+        openAISocket = new WebSocket(wsUrl);
         
-        // Use API key in subprotocol for Deno compatibility
-        openAISocket = new WebSocket(wsUrl, [
-          `Authorization.Bearer.${apiKey}`,
-          'realtime'
-        ]);
-
         openAISocket.onopen = () => {
-          console.log('🧠 OpenAI WebSocket connected successfully!');
+          console.log('🧠 OpenAI WebSocket connected!');
           
-          // First, update session configuration
+          // Send authentication via first message (some APIs support this)
+          const authMessage = {
+            type: 'auth',
+            token: apiKey
+          };
+          
+          try {
+            openAISocket.send(JSON.stringify(authMessage));
+            console.log('🔑 Auth message sent');
+          } catch (authError) {
+            console.log('⚠️ Auth message failed, trying session setup...');
+          }
+          
+          // Setup session configuration
           const sessionUpdate = {
             type: 'session.update',
             session: {
@@ -228,11 +236,14 @@ serve(async (req) => {
 
         openAISocket.onerror = (error) => {
           console.error('❌ OpenAI WebSocket error:', error);
+          console.error('❌ Error type:', typeof error);
+          console.error('❌ Error details:', JSON.stringify(error));
           isOpenAIReady = false;
         };
 
         openAISocket.onclose = (event) => {
-          console.log('🧠 OpenAI disconnected:', event.code, event.reason);
+          console.log('🧠 OpenAI disconnected - Code:', event.code, 'Reason:', event.reason);
+          console.log('🧠 Was clean:', event.wasClean);
           isOpenAIReady = false;
         };
 
