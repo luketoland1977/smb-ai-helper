@@ -40,19 +40,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           setTimeout(async () => {
             try {
+              console.log('🔍 Fetching roles for user:', session.user.id);
               const { data: roles, error } = await supabase
                 .from('user_roles')
                 .select('role')
                 .eq('user_id', session.user.id);
               
+              console.log('📋 User roles response:', { roles, error });
+              
               if (!error && roles) {
-                setUserRoles(roles.map(r => r.role as UserRole));
+                const userRolesList = roles.map(r => r.role as UserRole);
+                console.log('✅ Setting user roles:', userRolesList);
+                setUserRoles(userRolesList);
+              } else {
+                console.error('❌ Error fetching user roles:', error);
+                setUserRoles([]);
               }
             } catch (error) {
-              console.error('Error fetching user roles:', error);
+              console.error('💥 Exception fetching user roles:', error);
+              setUserRoles([]);
             }
           }, 0);
         } else {
+          console.log('👤 No user session, clearing roles');
           setUserRoles([]);
         }
         
