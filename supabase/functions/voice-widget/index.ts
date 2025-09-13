@@ -45,9 +45,31 @@ serve(async (req) => {
   }
 
   try {
-    const { message, client_id, agent_id, session_id, system_prompt } = await req.json();
+    const requestData = await req.json();
+    const { message, client_id, agent_id, session_id, system_prompt } = requestData;
 
-    if (!message || !client_id) {
+    // Input validation
+    if (!message || typeof message !== 'string') {
+      console.error('❌ Invalid message:', message);
+      return new Response(JSON.stringify({ error: 'Message is required and must be a string' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    if (!client_id || typeof client_id !== 'string') {
+      console.error('❌ Invalid client_id:', client_id);
+      return new Response(JSON.stringify({ error: 'Client ID is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Sanitize inputs
+    const sanitizedMessage = message.slice(0, 2000); // Limit message length
+    const sanitizedClientId = client_id.slice(0, 36); // Limit to UUID length
+
+    if (!sanitizedMessage.trim() || !sanitizedClientId) {
       return new Response(JSON.stringify({ error: 'Message and client_id are required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

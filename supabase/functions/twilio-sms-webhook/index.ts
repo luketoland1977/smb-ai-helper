@@ -95,9 +95,31 @@ serve(async (req) => {
     const body = formData.get('Body') as string;
     const messageSid = formData.get('MessageSid') as string;
 
-    console.log('Received SMS:', { from, to, body, messageSid });
-
+    // Input validation and sanitization
     if (!from || !to || !body) {
+      console.error('❌ Missing required SMS parameters:', { from, to, body });
+      return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+        status: 400
+      });
+    }
+    
+    // Sanitize and validate phone numbers (basic format check)
+    const phoneRegex = /^\+[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(from) || !phoneRegex.test(to)) {
+      console.error('❌ Invalid phone number format:', { from, to });
+      return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+        status: 400
+      });
+    }
+    
+    // Sanitize message body to prevent injection attacks
+    const sanitizedBody = body.slice(0, 1000).replace(/[<>&"']/g, ''); // Remove potential XML/HTML chars
+    
+    console.log('📱 SMS received:', { from, to, messageLength: sanitizedBody.length });
+
+    if (!sanitizedBody.trim()) {
       throw new Error('Missing required SMS parameters');
     }
 

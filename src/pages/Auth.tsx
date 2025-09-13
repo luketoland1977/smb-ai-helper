@@ -19,21 +19,60 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
+    // Input validation
+    if (!email || !email.includes('@')) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+    
+    if (!password || password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const redirectUrl = `${window.location.origin}/`;
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: redirectUrl
+      }
     });
 
     console.log('Signup response:', { data, error });
-    console.log('Session exists:', !!data.session);
-    console.log('User exists:', !!data.user);
 
     if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Handle specific error types
+      if (error.message.includes('already registered')) {
+        toast({
+          title: "Account exists",
+          description: "This email is already registered. Please sign in instead.",
+          variant: "destructive",
+        });
+      } else if (error.message.includes('password')) {
+        toast({
+          title: "Password error",
+          description: "Password must be at least 6 characters long.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } else if (data.session) {
       // User is immediately signed in (email confirmation disabled)
       toast({
@@ -42,10 +81,10 @@ const Auth = () => {
       });
       navigate('/dashboard');
     } else if (data.user && !data.session) {
-      // Email confirmation is enabled but appears disabled in settings
+      // Email confirmation is enabled
       toast({
         title: "Account Created",
-        description: "You can now sign in with your credentials. Email confirmation may need to be disabled in Supabase settings.",
+        description: "Please check your email for the confirmation link.",
         variant: "default",
       });
     } else {
@@ -62,26 +101,58 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
+    // Input validation
+    if (!email || !email.includes('@')) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+    
+    if (!password) {
+      toast({
+        title: "Error",
+        description: "Please enter your password.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      if (error.message === "Email not confirmed") {
+      // Handle specific error types with better security messaging
+      if (error.message.includes('Invalid login credentials')) {
         toast({
-          title: "Email Not Confirmed",
-          description: "Your account exists but needs to be confirmed. Please check your email or contact support to manually confirm your account.",
+          title: "Login failed",
+          description: "Invalid email or password. Please check your credentials.",
+          variant: "destructive",
+        });
+      } else if (error.message.includes('Email not confirmed')) {
+        toast({
+          title: "Email not verified",
+          description: "Please check your email and click the confirmation link.",
           variant: "destructive",
         });
       } else {
         toast({
           title: "Error",
-          description: error.message,
+          description: "Login failed. Please try again.",
           variant: "destructive",
         });
       }
     } else {
+      toast({
+        title: "Success",
+        description: "Welcome back!",
+      });
       navigate('/dashboard');
     }
     
