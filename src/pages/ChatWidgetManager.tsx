@@ -102,7 +102,6 @@ const ChatWidgetManager = () => {
     phone_number: '',
     sms_enabled: true,
     voice_enabled: true,
-    use_realtime: false,
     voice: 'alice',
     language: 'en-US',
     welcome_message: '',
@@ -354,8 +353,7 @@ const ChatWidgetManager = () => {
             voice: twilioFormData.voice,
             language: twilioFormData.language,
             welcome_message: twilioFormData.welcome_message,
-            follow_up_message: twilioFormData.follow_up_message,
-            use_realtime: twilioFormData.use_realtime
+            follow_up_message: twilioFormData.follow_up_message
           }
         })
         .select()
@@ -378,7 +376,6 @@ const ChatWidgetManager = () => {
         phone_number: '',
         sms_enabled: true,
         voice_enabled: true,
-        use_realtime: false,
         voice: 'alice',
         language: 'en-US',
         welcome_message: '',
@@ -389,7 +386,7 @@ const ChatWidgetManager = () => {
       console.error('Error creating Twilio integration:', error);
       toast({
         title: "Error",
-        description: "Failed to create phone integration",
+        description: `Failed to create phone integration: ${error.message || error}`,
         variant: "destructive",
       });
     }
