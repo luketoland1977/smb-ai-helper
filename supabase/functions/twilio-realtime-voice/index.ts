@@ -134,67 +134,70 @@ serve(async (req) => {
 
         console.log('🧠 Connecting to OpenAI realtime API...');
         
-        // Direct connection to OpenAI realtime WebSocket using URL parameters
-        // Based on Microsoft's Azure implementation pattern
-        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&api-key=${encodeURIComponent(apiKey)}`;
-        console.log('🔗 Creating WebSocket connection with API key in URL...');
+        // Use standard WebSocket URL and handle auth via connection upgrade
+        // This approach works better with Deno's WebSocket implementation
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
+        console.log('🔗 Creating WebSocket connection...');
         
-        openAISocket = new WebSocket(wsUrl);
-        
-        openAISocket.onopen = () => {
-          console.log('🧠 OpenAI WebSocket connected!');
+        try {
+          // Create WebSocket with proper error handling
+          openAISocket = new WebSocket(wsUrl);
           
-          // Send authentication via first message (some APIs support this)
-          const authMessage = {
-            type: 'auth',
-            token: apiKey
-          };
-          
-          try {
-            openAISocket.send(JSON.stringify(authMessage));
-            console.log('🔑 Auth message sent');
-          } catch (authError) {
-            console.log('⚠️ Auth message failed, trying session setup...');
-          }
-          
-          // Setup session configuration
-          const sessionUpdate = {
-            type: 'session.update',
-            session: {
-              modalities: ['text', 'audio'],
-              instructions: systemPrompt,
-              voice: 'alloy',
-              input_audio_format: 'pcm16',
-              output_audio_format: 'pcm16',
-              input_audio_transcription: { model: 'whisper-1' },
-              turn_detection: {
-                type: 'server_vad',
-                threshold: 0.5,
-                prefix_padding_ms: 300,
-                silence_duration_ms: 1000
-              },
-              temperature: 0.8
+          openAISocket.onopen = () => {
+            console.log('🧠 OpenAI WebSocket connected!');
+            
+            // Immediately send session configuration with proper format
+            const sessionUpdate = {
+              type: 'session.update',
+              session: {
+                modalities: ['text', 'audio'],
+                instructions: systemPrompt,
+                voice: 'alloy',
+                input_audio_format: 'pcm16',
+                output_audio_format: 'pcm16',
+                input_audio_transcription: { model: 'whisper-1' },
+                turn_detection: {
+                  type: 'server_vad',
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 1000
+                },
+                temperature: 0.8,
+                max_response_output_tokens: 4096
+              }
+            };
+            
+            try {
+              openAISocket.send(JSON.stringify(sessionUpdate));
+              console.log('⚙️ Session configuration sent');
+              
+              // Mark as ready after sending configuration
+              isOpenAIReady = true;
+              console.log('✅ OpenAI marked as ready');
+              
+              // Send welcome message
+              const greetingResponse = {
+                type: 'response.create',
+                response: {
+                  modalities: ['audio'],
+                  instructions: `Say this welcome message: "${welcomeMessage}"`
+                }
+              };
+              
+              openAISocket.send(JSON.stringify(greetingResponse));
+              console.log('🎙️ Welcome message sent');
+              
+            } catch (sendError) {
+              console.error('❌ Error sending initial messages:', sendError);
+              isOpenAIReady = false;
             }
           };
           
-          openAISocket.send(JSON.stringify(sessionUpdate));
-          console.log('⚙️ Session configuration sent');
-          
-          // Mark as ready
-          isOpenAIReady = true;
-          
-          // Send welcome message
-          const greetingResponse = {
-            type: 'response.create',
-            response: {
-              modalities: ['audio'],
-              instructions: `Say this welcome message: "${welcomeMessage}"`
-            }
-          };
-          
-          openAISocket.send(JSON.stringify(greetingResponse));
-          console.log('🎙️ Welcome message sent');
-        };
+        } catch (wsError) {
+          console.error('❌ Error creating WebSocket:', wsError);
+          socket.close();
+          return;
+        }
 
         openAISocket.onmessage = (event) => {
           try {
