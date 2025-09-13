@@ -136,12 +136,12 @@ serve(async (req) => {
         }
 
         console.log('🧠 Connecting to OpenAI immediately...');
-        openAISocket = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'OpenAI-Beta': 'realtime=v1'
-          }
-        });
+        
+        // For Deno WebSocket, we need to use URL parameters for authentication
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&bearer=${encodeURIComponent(apiKey)}`;
+        console.log('🌐 Connecting to:', wsUrl.replace(apiKey, '***'));
+        
+        openAISocket = new WebSocket(wsUrl);
 
         openAISocket.onopen = () => {
           console.log('🧠 OpenAI connected successfully');
