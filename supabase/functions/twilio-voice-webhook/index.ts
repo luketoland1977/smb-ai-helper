@@ -45,7 +45,6 @@ serve(async (req) => {
       
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice">Hello! This is PRO WEB SUPPORT. Connecting you now.</Say>
     <Connect>
         <Stream url="wss://ycvvuepfsebqpwmamqgg.functions.supabase.co/functions/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&amp;from=${encodeURIComponent(from)}&amp;to=${encodeURIComponent(to)}" />
     </Connect>
