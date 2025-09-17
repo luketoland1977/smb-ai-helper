@@ -16,7 +16,7 @@ const Navbar = () => {
   };
 
   const handleDashboardAction = () => {
-    navigate('/dashboard');
+    navigate('/admin-panel');
   };
 
   return (
@@ -56,7 +56,7 @@ const Navbar = () => {
                     onClick={handleDashboardAction}
                   >
                     <User className="h-4 w-4 mr-2" />
-                    Dashboard
+                    Admin Panel
                   </Button>
                 )}
                 <Button 

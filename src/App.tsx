@@ -8,7 +8,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
+import AdminPanel from "./pages/AdminPanel";
 import ClientForm from "./pages/ClientForm";
 import AgentForm from "./pages/AgentForm";
 import Chat from "./pages/Chat";
@@ -31,10 +31,19 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route 
+              path="/admin-panel" 
+              element={
+                <ProtectedRoute roles={['admin', 'salesperson', 'support']}>
+                  <AdminPanel />
+                </ProtectedRoute>
+              } 
+            />
+            {/* Legacy route redirect */}
+            <Route 
               path="/dashboard" 
               element={
                 <ProtectedRoute roles={['admin', 'salesperson', 'support']}>
-                  <Dashboard />
+                  <AdminPanel />
                 </ProtectedRoute>
               } 
             />
