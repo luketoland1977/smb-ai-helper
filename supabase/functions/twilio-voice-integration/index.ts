@@ -302,7 +302,6 @@ serve(async (req) => {
           if (heartbeatInterval) clearInterval(heartbeatInterval);
           heartbeatInterval = setInterval(() => {
             if (openAISocket && openAISocket.readyState === WebSocket.OPEN) {
-              // Send a ping to keep connection alive
               try {
                 openAISocket.send(JSON.stringify({ type: 'ping' }));
                 console.log('Sent heartbeat ping to OpenAI');
@@ -319,7 +318,7 @@ serve(async (req) => {
           console.log('OpenAI event:', data.type);
           
           if (data.type === 'session.created') {
-            // Configure the session
+            // Configure the session with our settings
             const systemPrompt = agentConfig?.ai_agents?.system_prompt || 
               "You are a helpful voice assistant. Keep responses concise and conversational.";
             
