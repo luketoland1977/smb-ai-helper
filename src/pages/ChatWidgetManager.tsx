@@ -199,7 +199,7 @@ const ChatWidgetManager = () => {
 
   const generateWebhookUrls = () => {
     return {
-      voice: 'https://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-voice-webhook',
+      voice: 'https://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-voice-integration/incoming-call',
       sms: 'https://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-sms-webhook'
     };
   };

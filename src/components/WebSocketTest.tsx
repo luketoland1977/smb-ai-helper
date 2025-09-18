@@ -15,7 +15,7 @@ const WebSocketTest = () => {
       console.log('Attempting to connect to WebSocket...');
       
       // Test WebSocket connection directly
-      const wsUrl = 'wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=test123&from=+1234567890&to=+18447890436';
+      const wsUrl = 'wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-integration?callSid=test123&from=+1234567890&to=+18447890436';
       
       console.log('WebSocket URL:', wsUrl);
       setConnectionStatus('Connecting...');
@@ -118,7 +118,7 @@ const WebSocketTest = () => {
       <CardHeader>
         <CardTitle>WebSocket Connection Test</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Test direct connection to twilio-realtime-voice function
+          Test direct connection to twilio-voice-integration function
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
