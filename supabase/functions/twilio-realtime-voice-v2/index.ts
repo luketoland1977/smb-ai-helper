@@ -6,7 +6,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Audio conversion utilities
+// Audio conversion utilities for Twilio compatibility
 function mulawToPcm16(mulawData: Uint8Array): Uint8Array {
   const pcm16Data = new Int16Array(mulawData.length);
   const mulawToLinear = [
@@ -77,47 +77,30 @@ function pcm16ToMulaw(pcm16Data: Uint8Array): Uint8Array {
   return mulawData;
 }
 
-// Text-to-Speech conversion using OpenAI
-async function textToSpeech(text: string, voice: string = 'alloy'): Promise<Uint8Array> {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) {
-    throw new Error('OpenAI API key not found');
+// Convert PCM16 audio to base64 for OpenAI Realtime API
+function encodeAudioToBase64(pcm16Data: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  
+  for (let i = 0; i < pcm16Data.length; i += chunkSize) {
+    const chunk = pcm16Data.subarray(i, Math.min(i + chunkSize, pcm16Data.length));
+    binary += String.fromCharCode(...chunk);
   }
-
-  console.log('🎙️ Converting text to speech:', text.substring(0, 50) + '...');
   
-  const response = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'tts-1',
-      input: text,
-      voice: voice,
-      response_format: 'wav', // Use WAV format for better compatibility
-      speed: 1.0
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('❌ TTS API error:', response.status, errorText);
-    throw new Error(`TTS failed: ${response.status}`);
-  }
-
-  const audioData = await response.arrayBuffer();
-  const wavData = new Uint8Array(audioData);
-  
-  // Extract PCM data from WAV file (skip 44-byte header)
-  const pcmData = wavData.slice(44);
-  
-  // Resample to 8kHz mono 16-bit for Twilio compatibility
-  return resampleAudio(pcmData, 24000, 8000);
+  return btoa(binary);
 }
 
-// Resample audio from one sample rate to another
+// Convert base64 audio from OpenAI to PCM16
+function decodeAudioFromBase64(base64Audio: string): Uint8Array {
+  const binary = atob(base64Audio);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// Resample audio between sample rates
 function resampleAudio(inputData: Uint8Array, inputSampleRate: number, outputSampleRate: number): Uint8Array {
   const inputSamples = new Int16Array(inputData.buffer);
   const resampleRatio = inputSampleRate / outputSampleRate;
@@ -130,113 +113,6 @@ function resampleAudio(inputData: Uint8Array, inputSampleRate: number, outputSam
   }
   
   return new Uint8Array(outputSamples.buffer);
-}
-
-// Speech-to-Text conversion using OpenAI
-async function speechToText(audioData: Uint8Array): Promise<string> {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) {
-    throw new Error('OpenAI API key not found');
-  }
-
-  console.log('🎧 Converting speech to text...');
-  
-  // Create proper WAV file with headers
-  const wavData = createWavFile(audioData, 8000, 1, 16); // 8kHz mono 16-bit for Twilio
-  
-  const formData = new FormData();
-  const blob = new Blob([wavData], { type: 'audio/wav' });
-  formData.append('file', blob, 'audio.wav');
-  formData.append('model', 'whisper-1');
-  formData.append('language', 'en');
-
-  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('❌ STT API error:', response.status, errorText);
-    throw new Error(`STT failed: ${response.status}`);
-  }
-
-  const result = await response.json();
-  return result.text || '';
-}
-
-// Create proper WAV file with headers
-function createWavFile(pcmData: Uint8Array, sampleRate: number, channels: number, bitsPerSample: number): Uint8Array {
-  const byteRate = sampleRate * channels * (bitsPerSample / 8);
-  const blockAlign = channels * (bitsPerSample / 8);
-  const wavHeaderLength = 44;
-  
-  const wavBuffer = new ArrayBuffer(wavHeaderLength + pcmData.length);
-  const view = new DataView(wavBuffer);
-  
-  // RIFF header
-  view.setUint32(0, 0x52494646, false); // "RIFF"
-  view.setUint32(4, 36 + pcmData.length, true); // File size - 8
-  view.setUint32(8, 0x57415645, false); // "WAVE"
-  
-  // Format chunk
-  view.setUint32(12, 0x666d7420, false); // "fmt "
-  view.setUint32(16, 16, true); // Format chunk size
-  view.setUint16(20, 1, true); // Audio format (1 = PCM)
-  view.setUint16(22, channels, true); // Number of channels
-  view.setUint32(24, sampleRate, true); // Sample rate
-  view.setUint32(28, byteRate, true); // Byte rate
-  view.setUint16(32, blockAlign, true); // Block align
-  view.setUint16(34, bitsPerSample, true); // Bits per sample
-  
-  // Data chunk
-  view.setUint32(36, 0x64617461, false); // "data"
-  view.setUint32(40, pcmData.length, true); // Data size
-  
-  // Copy PCM data
-  const uint8View = new Uint8Array(wavBuffer);
-  uint8View.set(pcmData, wavHeaderLength);
-  
-  return uint8View;
-}
-
-// Chat completion using OpenAI
-async function getChatResponse(message: string, systemPrompt: string): Promise<string> {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) {
-    throw new Error('OpenAI API key not found');
-  }
-
-  console.log('🤖 Getting chat response for:', message.substring(0, 50) + '...');
-  
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ],
-      max_tokens: 150,
-      temperature: 0.7
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('❌ Chat API error:', response.status, errorText);
-    throw new Error(`Chat failed: ${response.status}`);
-  }
-
-  const result = await response.json();
-  return result.choices[0]?.message?.content || 'I apologize, but I could not process your request.';
 }
 
 serve(async (req) => {
@@ -283,52 +159,154 @@ serve(async (req) => {
     }
 
     const { socket, response } = Deno.upgradeWebSocket(req);
-    
-    let audioBuffer: Uint8Array[] = [];
-    let isProcessing = false;
-    let conversationStarted = false;
+    let openAISocket: WebSocket | null = null;
+    let sessionReady = false;
 
     socket.onopen = async () => {
       console.log('🔗 Twilio WebSocket connected');
       
-      // Send welcome message immediately
-      if (!conversationStarted) {
-        conversationStarted = true;
-        console.log('🎙️ Sending welcome message...');
-        
-        try {
-          const welcomeAudio = await textToSpeech(agentConfig.welcomeMessage, agentConfig.voice);
-          const mulawData = pcm16ToMulaw(welcomeAudio);
-          
-          // Send audio in smaller chunks to ensure proper playback
-          const chunkSize = 160; // Standard 20ms chunk for 8kHz
-          for (let i = 0; i < mulawData.length; i += chunkSize) {
-            const chunk = mulawData.slice(i, i + chunkSize);
-            const base64Chunk = btoa(String.fromCharCode(...chunk));
-            
-            const mediaMsg = {
-              event: "media",
-              streamSid: callSid,
-              media: {
-                track: "outbound",
-                chunk: (Math.floor(i / chunkSize)).toString(),
-                timestamp: Date.now().toString(),
-                payload: base64Chunk
-              }
-            };
-            
-            socket.send(JSON.stringify(mediaMsg));
-            
-            // Small delay between chunks to prevent buffer overflow
-            if (i + chunkSize < mulawData.length) {
-              await new Promise(resolve => setTimeout(resolve, 20)); // 20ms delay
+      try {
+        // Connect to OpenAI Realtime API
+        const apiKey = Deno.env.get('OPENAI_API_KEY');
+        if (!apiKey) {
+          throw new Error('OpenAI API key not found');
+        }
+
+        console.log('🤖 Connecting to OpenAI Realtime API...');
+        openAISocket = new WebSocket(
+          "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
+          [],
+          {
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "OpenAI-Beta": "realtime=v1"
             }
           }
-          
-          console.log('✅ Welcome message sent successfully');
-        } catch (error) {
-          console.error('❌ Welcome message error:', error);
-        }
+        );
+
+        openAISocket.onopen = () => {
+          console.log('✅ Connected to OpenAI Realtime API');
+        };
+
+        openAISocket.onmessage = async (event) => {
+          try {
+            const openAIData = JSON.parse(event.data);
+            console.log('🤖 OpenAI event:', openAIData.type);
+
+            if (openAIData.type === 'session.created') {
+              console.log('🎬 OpenAI session created, configuring...');
+              
+              // Configure session with agent settings
+              const sessionUpdate = {
+                type: 'session.update',
+                session: {
+                  modalities: ['text', 'audio'],
+                  instructions: agentConfig.prompt,
+                  voice: agentConfig.voice,
+                  input_audio_format: 'pcm16',
+                  output_audio_format: 'pcm16',
+                  input_audio_transcription: {
+                    model: 'whisper-1'
+                  },
+                  turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.5,
+                    prefix_padding_ms: 300,
+                    silence_duration_ms: 1000
+                  },
+                  temperature: 0.7,
+                  max_response_output_tokens: 'inf'
+                }
+              };
+              
+              openAISocket?.send(JSON.stringify(sessionUpdate));
+              
+            } else if (openAIData.type === 'session.updated') {
+              console.log('✅ OpenAI session configured');
+              sessionReady = true;
+              
+              // Send welcome message
+              const welcomeEvent = {
+                type: 'conversation.item.create',
+                item: {
+                  type: 'message',
+                  role: 'assistant',
+                  content: [
+                    {
+                      type: 'input_text',
+                      text: agentConfig.welcomeMessage
+                    }
+                  ]
+                }
+              };
+              
+              openAISocket?.send(JSON.stringify(welcomeEvent));
+              openAISocket?.send(JSON.stringify({ type: 'response.create' }));
+              
+            } else if (openAIData.type === 'response.audio.delta') {
+              // Convert OpenAI audio to Twilio format
+              const pcm16Data = decodeAudioFromBase64(openAIData.delta);
+              
+              // Resample from 24kHz to 8kHz for Twilio
+              const resampledData = resampleAudio(pcm16Data, 24000, 8000);
+              const mulawData = pcm16ToMulaw(resampledData);
+              
+              // Send to Twilio in chunks
+              const chunkSize = 160; // 20ms at 8kHz
+              for (let i = 0; i < mulawData.length; i += chunkSize) {
+                const chunk = mulawData.slice(i, i + chunkSize);
+                const base64Chunk = btoa(String.fromCharCode(...chunk));
+                
+                const mediaMsg = {
+                  event: "media",
+                  streamSid: callSid,
+                  media: {
+                    track: "outbound",
+                    chunk: (Math.floor(i / chunkSize)).toString(),
+                    timestamp: Date.now().toString(),
+                    payload: base64Chunk
+                  }
+                };
+                
+                socket.send(JSON.stringify(mediaMsg));
+                
+                // Small delay between chunks
+                if (i + chunkSize < mulawData.length) {
+                  await new Promise(resolve => setTimeout(resolve, 20));
+                }
+              }
+              
+            } else if (openAIData.type === 'response.audio_transcript.delta') {
+              console.log('📝 AI said:', openAIData.delta);
+              
+            } else if (openAIData.type === 'input_audio_buffer.speech_started') {
+              console.log('👂 User started speaking');
+              
+            } else if (openAIData.type === 'input_audio_buffer.speech_stopped') {
+              console.log('✋ User stopped speaking');
+              
+            } else if (openAIData.type === 'conversation.item.input_audio_transcription.completed') {
+              console.log('📝 User said:', openAIData.transcript);
+              
+            } else if (openAIData.type === 'error') {
+              console.error('❌ OpenAI API error:', openAIData.error);
+            }
+            
+          } catch (parseError) {
+            console.error('❌ Error parsing OpenAI message:', parseError);
+          }
+        };
+
+        openAISocket.onerror = (error) => {
+          console.error('❌ OpenAI WebSocket error:', error);
+        };
+
+        openAISocket.onclose = (event) => {
+          console.log('🔌 OpenAI WebSocket closed:', event.code, event.reason);
+        };
+
+      } catch (error) {
+        console.error('❌ Error connecting to OpenAI:', error);
       }
     };
 
@@ -339,8 +317,8 @@ serve(async (req) => {
         if (data.event === "start") {
           console.log('🎬 Call started');
           
-        } else if (data.event === "media") {
-          // Collect audio data
+        } else if (data.event === "media" && sessionReady && openAISocket) {
+          // Convert Twilio audio to OpenAI format
           const audioPayload = atob(data.media.payload);
           const mulawData = new Uint8Array(audioPayload.length);
           for (let i = 0; i < audioPayload.length; i++) {
@@ -348,77 +326,22 @@ serve(async (req) => {
           }
           
           const pcm16Data = mulawToPcm16(mulawData);
-          audioBuffer.push(pcm16Data);
           
-          // Process audio when we have enough data and not already processing
-          if (audioBuffer.length > 100 && !isProcessing) {
-            isProcessing = true;
-            console.log('🎧 Processing collected audio...');
-            
-            try {
-              // Combine audio chunks
-              const totalLength = audioBuffer.reduce((acc, chunk) => acc + chunk.length, 0);
-              const combinedAudio = new Uint8Array(totalLength);
-              let offset = 0;
-              
-              for (const chunk of audioBuffer) {
-                combinedAudio.set(chunk, offset);
-                offset += chunk.length;
-              }
-              
-              // Clear buffer
-              audioBuffer = [];
-              
-              // Convert to text
-              const transcription = await speechToText(combinedAudio);
-              console.log('📝 User said:', transcription);
-              
-              if (transcription.trim().length > 5) {
-                // Get AI response
-                const aiResponse = await getChatResponse(transcription, agentConfig.prompt);
-                console.log('🤖 AI response:', aiResponse);
-                
-                // Convert to speech
-                const responseAudio = await textToSpeech(aiResponse, agentConfig.voice);
-                const mulawResponse = pcm16ToMulaw(responseAudio);
-                
-                // Send response in chunks like welcome message
-                const chunkSize = 160; // Standard 20ms chunk for 8kHz
-                for (let i = 0; i < mulawResponse.length; i += chunkSize) {
-                  const chunk = mulawResponse.slice(i, i + chunkSize);
-                  const base64Chunk = btoa(String.fromCharCode(...chunk));
-                  
-                  const responseMsg = {
-                    event: "media",
-                    streamSid: callSid,
-                    media: {
-                      track: "outbound",
-                      chunk: (Math.floor(i / chunkSize)).toString(),
-                      timestamp: Date.now().toString(),
-                      payload: base64Chunk
-                    }
-                  };
-                  
-                  socket.send(JSON.stringify(responseMsg));
-                  
-                  // Small delay between chunks
-                  if (i + chunkSize < mulawResponse.length) {
-                    await new Promise(resolve => setTimeout(resolve, 20));
-                  }
-                }
-                
-                console.log('✅ AI response sent successfully');
-              }
-              
-            } catch (error) {
-              console.error('❌ Audio processing error:', error);
-            } finally {
-              isProcessing = false;
-            }
-          }
+          // Resample from 8kHz to 24kHz for OpenAI
+          const resampledData = resampleAudio(pcm16Data, 8000, 24000);
+          const base64Audio = encodeAudioToBase64(resampledData);
+          
+          // Send to OpenAI
+          const audioEvent = {
+            type: 'input_audio_buffer.append',
+            audio: base64Audio
+          };
+          
+          openAISocket.send(JSON.stringify(audioEvent));
           
         } else if (data.event === "stop") {
           console.log('🛑 Call ended');
+          openAISocket?.close();
           socket.close();
         }
         
@@ -429,10 +352,12 @@ serve(async (req) => {
 
     socket.onclose = (event) => {
       console.log('🔌 Twilio WebSocket closed:', event.code, event.reason);
+      openAISocket?.close();
     };
 
     socket.onerror = (error) => {
       console.error('❌ Twilio WebSocket error:', error);
+      openAISocket?.close();
     };
 
     return response;
