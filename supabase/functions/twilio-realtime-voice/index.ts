@@ -173,8 +173,8 @@ serve(async (req) => {
         const ephemeralToken = tokenData.client_secret.value;
         console.log('🔗 Connecting to OpenAI WebSocket...');
 
-        // Connect to OpenAI with proper error handling - use URL auth parameter
-        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&authorization=Bearer%20${encodeURIComponent(ephemeralToken)}`;
+        // Connect to OpenAI WebSocket with authorization in URL
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&authorization=${encodeURIComponent(`Bearer ${ephemeralToken}`)}`;
         openAISocket = new WebSocket(wsUrl);
         
         openAISocket.onopen = () => {
