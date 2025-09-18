@@ -38,19 +38,20 @@ serve(async (req) => {
 
       console.log('📞 Call details:', { from, to, callSid });
 
-      // Connect directly to OpenAI realtime voice WebSocket
-      console.log('🚀 Connecting to OpenAI realtime voice WebSocket');
+      // Use Twilio's built-in speech recognition instead of WebSocket bridging
+      console.log('🎤 Setting up Twilio speech recognition with AI response');
       
-      // Return TwiML that connects to our realtime voice function
-      
+      // Return TwiML that uses Twilio's speech recognition
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Connect>
-        <Stream url="wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice-v2?callSid=${encodeURIComponent(callSid)}&amp;from=${encodeURIComponent(from)}&amp;to=${encodeURIComponent(to)}" />
-    </Connect>
+  <Say voice="alice">Hello! Thank you for calling. Please tell me how I can help you today.</Say>
+  <Gather input="speech" timeout="5" speechTimeout="2" action="https://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-ai-response">
+    <Say voice="alice">I'm listening...</Say>
+  </Gather>
+  <Say voice="alice">I didn't hear anything. Please try calling again.</Say>
 </Response>`;
 
-      console.log('📋 Returning WebSocket TwiML to Twilio');
+      console.log('📋 Returning Speech Recognition TwiML to Twilio');
       return new Response(twiml, {
         headers: { 'Content-Type': 'text/xml' },
       });
