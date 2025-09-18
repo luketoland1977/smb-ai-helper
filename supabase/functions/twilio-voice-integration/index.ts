@@ -248,13 +248,17 @@ serve(async (req) => {
         // Connect to OpenAI Realtime API  
         const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
         console.log('Connecting to OpenAI WebSocket:', wsUrl);
+        console.log('Using ephemeral token:', tokenData.client_secret.value.substring(0, 10) + '...');
         
-        openAISocket = new WebSocket(wsUrl);
-        
-        // Set authorization after connection
-        openAISocket.addEventListener('open', () => {
-          console.log('OpenAI WebSocket opened, sending auth...');
+        openAISocket = new WebSocket(wsUrl, [], {
+          headers: {
+            "Authorization": `Bearer ${tokenData.client_secret.value}`,
+            "OpenAI-Beta": "realtime=v1",
+          },
         });
+        
+        // Remove the old auth listener since we're using headers
+        console.log('WebSocket created with authentication headers');
         
         const handleOpenAIReconnect = () => {
           console.log('Handling OpenAI reconnection...');
