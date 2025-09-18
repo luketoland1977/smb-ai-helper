@@ -120,16 +120,43 @@ serve(async (req) => {
     const maxAttempts = 3;
     const heartbeatIntervalMs = 30000; // 30 seconds
     
-    // Get call details from URL parameters
-    const callSid = url.searchParams.get('callSid') || 'unknown';
-    const from = url.searchParams.get('from') || 'unknown';
-    const to = url.searchParams.get('to') || 'unknown';
+    // Get call details from URL parameters or headers
+    let callSid = url.searchParams.get('callSid') || req.headers.get('X-Twilio-CallSid') || 'unknown';
+    let from = url.searchParams.get('from') || req.headers.get('X-Twilio-From') || 'unknown';  
+    let to = url.searchParams.get('to') || req.headers.get('X-Twilio-To') || 'unknown';
+    
+    // Also try parsing from the full URL if query params are missing
+    if (callSid === 'unknown' || from === 'unknown' || to === 'unknown') {
+      const urlParts = req.url.match(/callSid=([^&]+)|from=([^&]+)|to=([^&]+)/g);
+      if (urlParts) {
+        urlParts.forEach(part => {
+          const [key, value] = part.split('=');
+          if (key === 'callSid' && callSid === 'unknown') callSid = decodeURIComponent(value);
+          if (key === 'from' && from === 'unknown') from = decodeURIComponent(value);  
+          if (key === 'to' && to === 'unknown') to = decodeURIComponent(value);
+        });
+      }
+    }
     
     console.log(`Call details - SID: ${callSid}, From: ${from}, To: ${to}`);
     
     // Fetch agent configuration from database
     let agentConfig: any = null;
     try {
+      console.log('Looking up agent config for phone number:', to);
+      
+      // Try multiple phone number formats
+      const phoneFormats = [
+        to,
+        to.replace(/[^\d]/g, ''), // digits only
+        '+1' + to.replace(/[^\d]/g, ''), // add +1 prefix
+        '(' + to.replace(/[^\d]/g, '').slice(1, 4) + ') ' + 
+        to.replace(/[^\d]/g, '').slice(4, 7) + '-' + 
+        to.replace(/[^\d]/g, '').slice(7) // formatted: (844) 415-2896
+      ];
+      
+      console.log('Trying phone formats:', phoneFormats);
+      
       const { data: twilioIntegration } = await supabase
         .from('twilio_integrations')
         .select(`
@@ -140,7 +167,7 @@ serve(async (req) => {
             settings
           )
         `)
-        .eq('phone_number', to)
+        .in('phone_number', phoneFormats)
         .eq('is_active', true)
         .single();
       
@@ -148,7 +175,7 @@ serve(async (req) => {
         agentConfig = twilioIntegration;
         console.log('Found agent configuration:', agentConfig.ai_agents?.name);
       } else {
-        console.log('No agent configuration found for phone number:', to);
+        console.log('No agent configuration found for any phone format');
       }
     } catch (error) {
       console.error('Error fetching agent config:', error);
@@ -218,12 +245,15 @@ serve(async (req) => {
         const tokenData = await tokenResponse.json();
         console.log('Got ephemeral token for attempt:', connectionAttempts);
         
-        // Connect to OpenAI Realtime API
-        openAISocket = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17", {
-          headers: {
-            "Authorization": `Bearer ${tokenData.client_secret.value}`,
-            "OpenAI-Beta": "realtime=v1",
-          },
+        // Connect to OpenAI Realtime API  
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
+        console.log('Connecting to OpenAI WebSocket:', wsUrl);
+        
+        openAISocket = new WebSocket(wsUrl);
+        
+        // Set authorization after connection
+        openAISocket.addEventListener('open', () => {
+          console.log('OpenAI WebSocket opened, sending auth...');
         });
         
         const handleOpenAIReconnect = () => {
@@ -240,6 +270,9 @@ serve(async (req) => {
               console.log('Attempting to reconnect to OpenAI...');
               connectToOpenAI();
             }, 1000 * connectionAttempts); // Exponential backoff
+          } else {
+            console.log('Not reconnecting - Twilio closed or max attempts reached');
+            socket.close();
           }
         };
         
