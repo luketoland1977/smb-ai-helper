@@ -120,6 +120,11 @@ serve(async (req) => {
     const maxAttempts = 3;
     const heartbeatIntervalMs = 30000; // 30 seconds
     
+    console.log('=== TWILIO VOICE INTEGRATION STARTED ===');
+    console.log('Request URL:', req.url);
+    console.log('Request method:', req.method);
+    console.log('Request headers:', JSON.stringify([...req.headers.entries()]));
+    
     // Get call details from URL parameters or headers
     let callSid = url.searchParams.get('callSid') || req.headers.get('X-Twilio-CallSid') || 'unknown';
     let from = url.searchParams.get('from') || req.headers.get('X-Twilio-From') || 'unknown';  
@@ -144,6 +149,15 @@ serve(async (req) => {
     let agentConfig: any = null;
     try {
       console.log('Looking up agent config for phone number:', to);
+      console.log('All search parameters:', [...url.searchParams.entries()]);
+      
+      // Also check if we can find any record regardless of phone format
+      const { data: allRecords } = await supabase
+        .from('twilio_integrations')
+        .select('phone_number, is_active')
+        .eq('is_active', true);
+      
+      console.log('All active Twilio integrations:', allRecords);
       
       // Try multiple phone number formats
       const phoneFormats = [
