@@ -120,8 +120,11 @@ async function speechToText(audioData: Uint8Array): Promise<string> {
 
   console.log('🎧 Converting speech to text...');
   
+  // Create proper WAV file with headers
+  const wavData = createWavFile(audioData, 8000, 1, 16); // 8kHz mono 16-bit for Twilio
+  
   const formData = new FormData();
-  const blob = new Blob([audioData], { type: 'audio/wav' });
+  const blob = new Blob([wavData], { type: 'audio/wav' });
   formData.append('file', blob, 'audio.wav');
   formData.append('model', 'whisper-1');
   formData.append('language', 'en');
@@ -142,6 +145,41 @@ async function speechToText(audioData: Uint8Array): Promise<string> {
 
   const result = await response.json();
   return result.text || '';
+}
+
+// Create proper WAV file with headers
+function createWavFile(pcmData: Uint8Array, sampleRate: number, channels: number, bitsPerSample: number): Uint8Array {
+  const byteRate = sampleRate * channels * (bitsPerSample / 8);
+  const blockAlign = channels * (bitsPerSample / 8);
+  const wavHeaderLength = 44;
+  
+  const wavBuffer = new ArrayBuffer(wavHeaderLength + pcmData.length);
+  const view = new DataView(wavBuffer);
+  
+  // RIFF header
+  view.setUint32(0, 0x52494646, false); // "RIFF"
+  view.setUint32(4, 36 + pcmData.length, true); // File size - 8
+  view.setUint32(8, 0x57415645, false); // "WAVE"
+  
+  // Format chunk
+  view.setUint32(12, 0x666d7420, false); // "fmt "
+  view.setUint32(16, 16, true); // Format chunk size
+  view.setUint16(20, 1, true); // Audio format (1 = PCM)
+  view.setUint16(22, channels, true); // Number of channels
+  view.setUint32(24, sampleRate, true); // Sample rate
+  view.setUint32(28, byteRate, true); // Byte rate
+  view.setUint16(32, blockAlign, true); // Block align
+  view.setUint16(34, bitsPerSample, true); // Bits per sample
+  
+  // Data chunk
+  view.setUint32(36, 0x64617461, false); // "data"
+  view.setUint32(40, pcmData.length, true); // Data size
+  
+  // Copy PCM data
+  const uint8View = new Uint8Array(wavBuffer);
+  uint8View.set(pcmData, wavHeaderLength);
+  
+  return uint8View;
 }
 
 // Chat completion using OpenAI
