@@ -92,7 +92,7 @@ serve(async (req) => {
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="wss://${url.host}/functions/v1/twilio-voice-integration" />
+    <Stream url="wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-integration" />
   </Connect>
 </Response>`;
     
