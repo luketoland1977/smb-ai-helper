@@ -174,11 +174,11 @@ serve(async (req) => {
 
         console.log('🤖 Connecting to OpenAI Realtime API...');
         
-        // Create WebSocket with proper Deno format - no custom headers support
-        // Include auth in URL or use alternative method
+        // Deno WebSocket doesn't support custom headers, so we use subprotocol for auth
+        // Format: openai-insecure-api-key.{api_key}
         openAISocket = new WebSocket(
           "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
-          [`Bearer.${apiKey}`, "realtime=v1"]
+          [`openai-insecure-api-key.${apiKey}`]
         );
 
         openAISocket.onopen = () => {
