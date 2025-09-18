@@ -166,19 +166,41 @@ serve(async (req) => {
       console.log('🔗 Twilio WebSocket connected');
       
       try {
-        // Connect to OpenAI Realtime API
+        // Get ephemeral token from OpenAI for WebSocket connection
         const apiKey = Deno.env.get('OPENAI_API_KEY');
         if (!apiKey) {
           throw new Error('OpenAI API key not found');
         }
 
+        console.log('🎫 Getting ephemeral token from OpenAI...');
+        
+        // Request ephemeral token for realtime session
+        const tokenResponse = await fetch("https://api.openai.com/v1/realtime/sessions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-realtime-preview-2024-10-01",
+            voice: agentConfig.voice,
+            instructions: agentConfig.prompt
+          }),
+        });
+
+        if (!tokenResponse.ok) {
+          throw new Error(`Failed to get ephemeral token: ${await tokenResponse.text()}`);
+        }
+
+        const tokenData = await tokenResponse.json();
+        console.log('✅ Got ephemeral token');
+
+        // Connect to OpenAI Realtime API using ephemeral token
         console.log('🤖 Connecting to OpenAI Realtime API...');
         
-        // Deno WebSocket doesn't support custom headers, so we use subprotocol for auth
-        // Format: openai-insecure-api-key.{api_key}
         openAISocket = new WebSocket(
-          "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
-          [`openai-insecure-api-key.${apiKey}`]
+          `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01`,
+          [`realtime`, `Bearer.${tokenData.client_secret.value}`]
         );
 
         openAISocket.onopen = () => {
