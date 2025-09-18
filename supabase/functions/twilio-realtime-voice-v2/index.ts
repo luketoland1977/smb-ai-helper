@@ -96,7 +96,7 @@ async function textToSpeech(text: string, voice: string = 'alloy'): Promise<Uint
       model: 'tts-1',
       input: text,
       voice: voice,
-      response_format: 'pcm',
+      response_format: 'wav', // Use WAV format for better compatibility
       speed: 1.0
     }),
   });
@@ -108,7 +108,28 @@ async function textToSpeech(text: string, voice: string = 'alloy'): Promise<Uint
   }
 
   const audioData = await response.arrayBuffer();
-  return new Uint8Array(audioData);
+  const wavData = new Uint8Array(audioData);
+  
+  // Extract PCM data from WAV file (skip 44-byte header)
+  const pcmData = wavData.slice(44);
+  
+  // Resample to 8kHz mono 16-bit for Twilio compatibility
+  return resampleAudio(pcmData, 24000, 8000);
+}
+
+// Resample audio from one sample rate to another
+function resampleAudio(inputData: Uint8Array, inputSampleRate: number, outputSampleRate: number): Uint8Array {
+  const inputSamples = new Int16Array(inputData.buffer);
+  const resampleRatio = inputSampleRate / outputSampleRate;
+  const outputLength = Math.floor(inputSamples.length / resampleRatio);
+  const outputSamples = new Int16Array(outputLength);
+  
+  for (let i = 0; i < outputLength; i++) {
+    const inputIndex = Math.floor(i * resampleRatio);
+    outputSamples[i] = inputSamples[inputIndex] || 0;
+  }
+  
+  return new Uint8Array(outputSamples.buffer);
 }
 
 // Speech-to-Text conversion using OpenAI
@@ -278,20 +299,33 @@ serve(async (req) => {
         try {
           const welcomeAudio = await textToSpeech(agentConfig.welcomeMessage, agentConfig.voice);
           const mulawData = pcm16ToMulaw(welcomeAudio);
-          const base64Mulaw = btoa(String.fromCharCode(...mulawData));
           
-          const mediaMsg = {
-            event: "media",
-            streamSid: callSid,
-            media: {
-              track: "outbound",
-              chunk: Date.now().toString(),
-              timestamp: Date.now().toString(),
-              payload: base64Mulaw
+          // Send audio in smaller chunks to ensure proper playback
+          const chunkSize = 160; // Standard 20ms chunk for 8kHz
+          for (let i = 0; i < mulawData.length; i += chunkSize) {
+            const chunk = mulawData.slice(i, i + chunkSize);
+            const base64Chunk = btoa(String.fromCharCode(...chunk));
+            
+            const mediaMsg = {
+              event: "media",
+              streamSid: callSid,
+              media: {
+                track: "outbound",
+                chunk: (Math.floor(i / chunkSize)).toString(),
+                timestamp: Date.now().toString(),
+                payload: base64Chunk
+              }
+            };
+            
+            socket.send(JSON.stringify(mediaMsg));
+            
+            // Small delay between chunks to prevent buffer overflow
+            if (i + chunkSize < mulawData.length) {
+              await new Promise(resolve => setTimeout(resolve, 20)); // 20ms delay
             }
-          };
+          }
           
-          socket.send(JSON.stringify(mediaMsg));
+          console.log('✅ Welcome message sent successfully');
         } catch (error) {
           console.error('❌ Welcome message error:', error);
         }
@@ -347,21 +381,33 @@ serve(async (req) => {
                 // Convert to speech
                 const responseAudio = await textToSpeech(aiResponse, agentConfig.voice);
                 const mulawResponse = pcm16ToMulaw(responseAudio);
-                const base64Response = btoa(String.fromCharCode(...mulawResponse));
                 
-                // Send response
-                const responseMsg = {
-                  event: "media",
-                  streamSid: callSid,
-                  media: {
-                    track: "outbound",
-                    chunk: Date.now().toString(),
-                    timestamp: Date.now().toString(),
-                    payload: base64Response
+                // Send response in chunks like welcome message
+                const chunkSize = 160; // Standard 20ms chunk for 8kHz
+                for (let i = 0; i < mulawResponse.length; i += chunkSize) {
+                  const chunk = mulawResponse.slice(i, i + chunkSize);
+                  const base64Chunk = btoa(String.fromCharCode(...chunk));
+                  
+                  const responseMsg = {
+                    event: "media",
+                    streamSid: callSid,
+                    media: {
+                      track: "outbound",
+                      chunk: (Math.floor(i / chunkSize)).toString(),
+                      timestamp: Date.now().toString(),
+                      payload: base64Chunk
+                    }
+                  };
+                  
+                  socket.send(JSON.stringify(responseMsg));
+                  
+                  // Small delay between chunks
+                  if (i + chunkSize < mulawResponse.length) {
+                    await new Promise(resolve => setTimeout(resolve, 20));
                   }
-                };
+                }
                 
-                socket.send(JSON.stringify(responseMsg));
+                console.log('✅ AI response sent successfully');
               }
               
             } catch (error) {
