@@ -187,11 +187,19 @@ serve(async (req) => {
       console.log(`Connecting to OpenAI (attempt ${connectionAttempts}/${maxAttempts})...`);
       
       try {
+        console.log('Getting OpenAI ephemeral token...');
+        const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+        console.log('OpenAI API Key exists:', !!openaiApiKey);
+        
+        if (!openaiApiKey) {
+          throw new Error('OPENAI_API_KEY environment variable is not set');
+        }
+        
         // Get OpenAI ephemeral token
         const tokenResponse = await fetch("https://api.openai.com/v1/realtime/sessions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+            "Authorization": `Bearer ${openaiApiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -201,7 +209,10 @@ serve(async (req) => {
         });
         
         if (!tokenResponse.ok) {
-          throw new Error(`Failed to get ephemeral token: ${tokenResponse.statusText}`);
+          const errorText = await tokenResponse.text();
+          console.error(`Failed to get ephemeral token: ${tokenResponse.status} ${tokenResponse.statusText}`);
+          console.error('Error response:', errorText);
+          throw new Error(`Failed to get ephemeral token: ${tokenResponse.statusText} - ${errorText}`);
         }
         
         const tokenData = await tokenResponse.json();
@@ -363,8 +374,14 @@ serve(async (req) => {
     };
     
     socket.onopen = async () => {
-      console.log('Twilio WebSocket connected');
-      await connectToOpenAI();
+      console.log('Twilio WebSocket connected - attempting OpenAI connection...');
+      try {
+        await connectToOpenAI();
+        console.log('OpenAI connection attempt completed');
+      } catch (error) {
+        console.error('Failed to connect to OpenAI:', error);
+        socket.close(1011, 'OpenAI connection failed');
+      }
     };
     
     socket.onmessage = (event) => {
