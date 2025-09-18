@@ -86,7 +86,7 @@ serve(async (req) => {
   }
   
   // Handle incoming call webhook - return TwiML
-  if (url.pathname === '/incoming-call') {
+  if (url.pathname === '/incoming-call' || url.pathname.endsWith('/incoming-call')) {
     console.log('Incoming call webhook received');
     
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
