@@ -11,6 +11,40 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Helper function to generate ElevenLabs audio
+async function generateElevenLabsAudio(text: string): Promise<string> {
+  const elevenlabsKey = Deno.env.get('ELEVENLABS_API_KEY');
+  if (!elevenlabsKey) {
+    throw new Error('ElevenLabs API key not configured');
+  }
+
+  const ttsResponse = await fetch('https://api.elevenlabs.io/v1/text-to-speech/9BWtsMINqrJLrRacOk9x', {
+    method: 'POST',
+    headers: {
+      'Accept': 'audio/mpeg',
+      'Content-Type': 'application/json',
+      'xi-api-key': elevenlabsKey,
+    },
+    body: JSON.stringify({
+      text: text,
+      model_id: 'eleven_turbo_v2_5',
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.5,
+        style: 0.0,
+        use_speaker_boost: true,
+      },
+    }),
+  });
+
+  if (!ttsResponse.ok) {
+    throw new Error(`ElevenLabs TTS error: ${await ttsResponse.text()}`);
+  }
+
+  const audioBuffer = await ttsResponse.arrayBuffer();
+  return btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+}
+
 serve(async (req) => {
   console.log('=== TWILIO AI RESPONSE WEBHOOK ===');
 
@@ -29,14 +63,18 @@ serve(async (req) => {
     console.log('📞 Call details:', { from, to });
 
     if (!speechResult) {
-      // No speech detected - ask again
+      // No speech detected - ask again using ElevenLabs
+      const noSpeechAudio = await generateElevenLabsAudio("I didn't catch that. Could you please repeat your question?");
+      const listeningAudio = await generateElevenLabsAudio("I'm listening...");
+      const goodbyeAudio = await generateElevenLabsAudio("Thank you for calling. Goodbye!");
+      
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">I didn't catch that. Could you please repeat your question?</Say>
+  <Play>data:audio/mp3;base64,${noSpeechAudio}</Play>
   <Gather input="speech" timeout="5" speechTimeout="2" action="${supabaseUrl}/functions/v1/twilio-ai-response">
-    <Say voice="alice">I'm listening...</Say>
+    <Play>data:audio/mp3;base64,${listeningAudio}</Play>
   </Gather>
-  <Say voice="alice">Thank you for calling. Goodbye!</Say>
+  <Play>data:audio/mp3;base64,${goodbyeAudio}</Play>
 </Response>`;
       
       return new Response(twiml, {
@@ -96,48 +134,21 @@ serve(async (req) => {
     
     console.log('🤖 AI response:', aiMessage);
 
-    // Generate speech using ElevenLabs
-    console.log('🎵 Generating speech with ElevenLabs...');
-    const elevenlabsKey = Deno.env.get('ELEVENLABS_API_KEY');
-    if (!elevenlabsKey) {
-      throw new Error('ElevenLabs API key not configured');
-    }
-
-    const ttsResponse = await fetch('https://api.elevenlabs.io/v1/text-to-speech/9BWtsMINqrJLrRacOk9x', {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': elevenlabsKey,
-      },
-      body: JSON.stringify({
-        text: aiMessage,
-        model_id: 'eleven_turbo_v2_5',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.5,
-          style: 0.0,
-          use_speaker_boost: true,
-        },
-      }),
-    });
-
-    if (!ttsResponse.ok) {
-      throw new Error(`ElevenLabs TTS error: ${await ttsResponse.text()}`);
-    }
-
-    // Convert audio to base64 for Twilio
-    const audioBuffer = await ttsResponse.arrayBuffer();
-    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+    // Use helper function instead of duplicate code
+    const base64Audio = await generateElevenLabsAudio(aiMessage);
+    
+    // Generate follow-up prompts using ElevenLabs
+    const followUpAudio = await generateElevenLabsAudio("Is there anything else I can help you with?");
+    const goodbyeAudio = await generateElevenLabsAudio("Thank you for calling. Have a great day!");
     
     // Create TwiML response with audio playback and continue conversation
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Play>data:audio/mp3;base64,${base64Audio}</Play>
   <Gather input="speech" timeout="5" speechTimeout="2" action="${supabaseUrl}/functions/v1/twilio-ai-response">
-    <Say voice="alice">Is there anything else I can help you with?</Say>
+    <Play>data:audio/mp3;base64,${followUpAudio}</Play>
   </Gather>
-  <Say voice="alice">Thank you for calling. Have a great day!</Say>
+  <Play>data:audio/mp3;base64,${goodbyeAudio}</Play>
 </Response>`;
 
     return new Response(twiml, {
@@ -147,9 +158,12 @@ serve(async (req) => {
   } catch (error) {
     console.error('💥 Error:', error);
     
+    // Generate error message using ElevenLabs
+    const errorAudio = await generateElevenLabsAudio("I'm sorry, I'm having technical difficulties. Please try calling again later.");
+    
     const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">I'm sorry, I'm having technical difficulties. Please try calling again later.</Say>
+  <Play>data:audio/mp3;base64,${errorAudio}</Play>
 </Response>`;
 
     return new Response(errorTwiml, {
