@@ -96,24 +96,34 @@ serve(async (req) => {
     
     console.log('🤖 AI response:', aiMessage);
 
-    // Generate speech using OpenAI TTS
-    console.log('🎵 Generating speech with OpenAI TTS...');
-    const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
+    // Generate speech using ElevenLabs
+    console.log('🎵 Generating speech with ElevenLabs...');
+    const elevenlabsKey = Deno.env.get('ELEVENLABS_API_KEY');
+    if (!elevenlabsKey) {
+      throw new Error('ElevenLabs API key not configured');
+    }
+
+    const ttsResponse = await fetch('https://api.elevenlabs.io/v1/text-to-speech/9BWtsMINqrJLrRacOk9x', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIKey}`,
+        'Accept': 'audio/mpeg',
         'Content-Type': 'application/json',
+        'xi-api-key': elevenlabsKey,
       },
       body: JSON.stringify({
-        model: 'tts-1-hd',
-        input: aiMessage,
-        voice: 'nova',
-        response_format: 'mp3',
+        text: aiMessage,
+        model_id: 'eleven_turbo_v2_5',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.5,
+          style: 0.0,
+          use_speaker_boost: true,
+        },
       }),
     });
 
     if (!ttsResponse.ok) {
-      throw new Error(`OpenAI TTS error: ${await ttsResponse.text()}`);
+      throw new Error(`ElevenLabs TTS error: ${await ttsResponse.text()}`);
     }
 
     // Convert audio to base64 for Twilio
