@@ -46,7 +46,7 @@ serve(async (req) => {
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
-        <Stream url="wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice?callSid=${encodeURIComponent(callSid)}&amp;from=${encodeURIComponent(from)}&amp;to=${encodeURIComponent(to)}" />
+        <Stream url="wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-realtime-voice-v2?callSid=${encodeURIComponent(callSid)}&amp;from=${encodeURIComponent(from)}&amp;to=${encodeURIComponent(to)}" />
     </Connect>
 </Response>`;
 

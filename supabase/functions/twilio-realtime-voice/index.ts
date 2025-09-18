@@ -173,9 +173,16 @@ serve(async (req) => {
         const ephemeralToken = tokenData.client_secret.value;
         console.log('🔗 Connecting to OpenAI WebSocket...');
 
-        // Connect to OpenAI WebSocket with authorization in URL
-        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&authorization=${encodeURIComponent(`Bearer ${ephemeralToken}`)}`;
-        openAISocket = new WebSocket(wsUrl);
+        // Create WebSocket connection using the ephemeral token correctly
+        // Based on OpenAI documentation, the ephemeral token should be used as the authorization
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
+        
+        // The ephemeral token IS the authorization - use it directly as Bearer token
+        // But for WebSocket, we need to pass it as a subprotocol or in a special way
+        console.log('🔑 Using ephemeral token for WebSocket auth...');
+        
+        // Try passing the authorization in the WebSocket subprotocols
+        openAISocket = new WebSocket(wsUrl, [`Bearer.${ephemeralToken.replace(/[^a-zA-Z0-9]/g, '_')}`]);
         
         openAISocket.onopen = () => {
           console.log('🧠 OpenAI WebSocket connected successfully');
