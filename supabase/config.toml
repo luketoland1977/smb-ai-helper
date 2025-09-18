@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.voice-widget]
 verify_jwt = false
+
+[functions.twilio-voice-integration]
+verify_jwt = false
