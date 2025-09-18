@@ -96,13 +96,34 @@ serve(async (req) => {
     
     console.log('🤖 AI response:', aiMessage);
 
-    // Create TwiML response with AI message and continue conversation
+    // Generate speech using OpenAI TTS
+    console.log('🎵 Generating speech with OpenAI TTS...');
+    const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'tts-1-hd',
+        input: aiMessage,
+        voice: 'nova',
+        response_format: 'mp3',
+      }),
+    });
+
+    if (!ttsResponse.ok) {
+      throw new Error(`OpenAI TTS error: ${await ttsResponse.text()}`);
+    }
+
+    // Convert audio to base64 for Twilio
+    const audioBuffer = await ttsResponse.arrayBuffer();
+    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+    
+    // Create TwiML response with audio playback and continue conversation
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">${aiMessage.replace(/[<>&"']/g, (match) => {
-    const escapes = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' };
-    return escapes[match] || match;
-  })}</Say>
+  <Play>data:audio/mp3;base64,${base64Audio}</Play>
   <Gather input="speech" timeout="5" speechTimeout="2" action="${supabaseUrl}/functions/v1/twilio-ai-response">
     <Say voice="alice">Is there anything else I can help you with?</Say>
   </Gather>
