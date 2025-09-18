@@ -17,6 +17,7 @@ import ChatWidgetManager from "./pages/ChatWidgetManager";
 import RoleRequests from "./pages/RoleRequests";
 import NotFound from "./pages/NotFound";
 import WebSocketTest from "./components/WebSocketTest";
+import VoiceDemo from "./pages/VoiceDemo";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/voice-demo" element={<VoiceDemo />} />
             <Route path="/auth" element={<Auth />} />
             <Route 
               path="/admin-panel" 
