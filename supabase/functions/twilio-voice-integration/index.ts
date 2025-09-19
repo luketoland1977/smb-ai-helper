@@ -107,7 +107,11 @@ serve(async (req) => {
   // Handle WebSocket upgrade for media stream
   const upgrade = req.headers.get("upgrade");
   if (upgrade === "websocket") {
+    console.log('=== TWILIO VOICE INTEGRATION STARTED ===');
     console.log('WebSocket upgrade request received');
+    console.log('Request URL:', req.url);
+    console.log('Request method:', req.method);
+    console.log('Request headers:', JSON.stringify([...req.headers.entries()]));
     
     const { socket, response } = Deno.upgradeWebSocket(req);
     
@@ -119,11 +123,6 @@ serve(async (req) => {
     let reconnectTimeout: number | null = null;
     const maxAttempts = 3;
     const heartbeatIntervalMs = 30000; // 30 seconds
-    
-    console.log('=== TWILIO VOICE INTEGRATION STARTED ===');
-    console.log('Request URL:', req.url);
-    console.log('Request method:', req.method);
-    console.log('Request headers:', JSON.stringify([...req.headers.entries()]));
     
     // Get call details from URL parameters or headers
     let callSid = url.searchParams.get('callSid') || req.headers.get('X-Twilio-CallSid') || 'unknown';
@@ -211,6 +210,27 @@ serve(async (req) => {
       }
     };
     
+    // Define reconnection handler function
+    const handleOpenAIReconnect = () => {
+      console.log('Handling OpenAI reconnection...');
+      sessionReady = false;
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+      }
+      
+      // Only reconnect if Twilio connection is still open
+      if (socket.readyState === WebSocket.OPEN && connectionAttempts < maxAttempts) {
+        reconnectTimeout = setTimeout(() => {
+          console.log('Attempting to reconnect to OpenAI...');
+          connectToOpenAI();
+        }, 1000 * connectionAttempts); // Exponential backoff
+      } else {
+        console.log('Not reconnecting - Twilio closed or max attempts reached');
+        socket.close();
+      }
+    };
+    
     // OpenAI connection function with retry logic
     const connectToOpenAI = async (): Promise<void> => {
       if (openAISocket && (openAISocket.readyState === WebSocket.OPEN || openAISocket.readyState === WebSocket.CONNECTING)) {
@@ -258,36 +278,19 @@ serve(async (req) => {
         
         const tokenData = await tokenResponse.json();
         console.log('Got ephemeral token for attempt:', connectionAttempts);
-        
-        // Connect to OpenAI Realtime API using URL-based authentication
-        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&access_token=${tokenData.client_secret.value}`;
-        console.log('Connecting to OpenAI WebSocket with URL-based authentication');
         console.log('Using ephemeral token:', tokenData.client_secret.value.substring(0, 10) + '...');
         
-        // Create WebSocket without headers - use URL-based auth instead
-        openAISocket = new WebSocket(wsUrl);
+        // Connect to OpenAI Realtime API with proper WebSocket URL format
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
+        console.log('Connecting to OpenAI WebSocket with proper headers');
         
-        console.log('WebSocket created with Authorization header');
-        
-        const handleOpenAIReconnect = () => {
-          console.log('Handling OpenAI reconnection...');
-          sessionReady = false;
-          if (heartbeatInterval) {
-            clearInterval(heartbeatInterval);
-            heartbeatInterval = null;
+        // Create WebSocket with authorization header
+        openAISocket = new WebSocket(wsUrl, {
+          headers: {
+            'Authorization': `Bearer ${tokenData.client_secret.value}`,
+            'OpenAI-Beta': 'realtime=v1'
           }
-          
-          // Only reconnect if Twilio connection is still open
-          if (socket.readyState === WebSocket.OPEN && connectionAttempts < maxAttempts) {
-            reconnectTimeout = setTimeout(() => {
-              console.log('Attempting to reconnect to OpenAI...');
-              connectToOpenAI();
-            }, 1000 * connectionAttempts); // Exponential backoff
-          } else {
-            console.log('Not reconnecting - Twilio closed or max attempts reached');
-            socket.close();
-          }
-        };
+        });
         
         openAISocket.onopen = () => {
           console.log(`OpenAI WebSocket connected successfully on attempt ${connectionAttempts}`);
@@ -457,11 +460,11 @@ serve(async (req) => {
               audioBuffer.push(audioMessage);
             }
           } catch (error) {
-            console.error('Error processing incoming audio:', error);
+            console.error('Error processing Twilio audio:', error);
           }
         }
       } else if (message.event === 'stop') {
-        console.log('Call ended');
+        console.log('Call stopped');
         cleanup();
       }
     };
@@ -479,5 +482,5 @@ serve(async (req) => {
     return response;
   }
   
-  return new Response("Not found", { status: 404 });
+  return new Response('Not found', { status: 404 });
 });
