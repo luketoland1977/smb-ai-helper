@@ -119,7 +119,8 @@ fastify.register(async (fastify) => {
         },
       };
 
-      console.log('🚀 FIXED VERSION - Sending session update:', JSON.stringify(sessionUpdate));
+      console.log('🆕 DEPLOYMENT TEST - Session update with type:', JSON.stringify(sessionUpdate));
+      console.log('🔍 Session object has type:', sessionUpdate.session.type);
       openAiWs.send(JSON.stringify(sessionUpdate));
 
       // Uncomment to have AI speak first:
@@ -331,5 +332,5 @@ fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
     console.error(err);
     process.exit(1);
   }
-  console.log(`Server is listening on port ${PORT}`);
+  console.log(`🔥 FORCE REDEPLOY v2 - Server is listening on port ${PORT}`);
 });
