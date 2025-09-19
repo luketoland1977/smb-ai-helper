@@ -5,7 +5,7 @@ node = "nodejs"
 nixPkgs = ["nodejs-18_x", "npm-9_x"]
 
 [phases.install]
-cmds = ["npm ci --prefer-offline --no-audit"]
+cmds = ["npm install"]
 
 [phases.build]
 cmds = ["echo 'No build step required'"]
@@ -14,5 +14,5 @@ cmds = ["echo 'No build step required'"]
 cmd = "npm start"
 
 [variables]
-NPM_CONFIG_PREFER_OFFLINE = "true"
+NPM_CONFIG_PREFER_OFFLINE = "false"
 NIXPACKS_NODE_VERSION = "18"

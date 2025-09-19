@@ -1,5 +1,5 @@
 {
   "providers": ["node"],
-  "buildCmd": "npm ci --prefer-offline --no-audit",
+  "buildCmd": "npm install",
   "startCmd": "npm start"
 }
