@@ -97,8 +97,9 @@ fastify.register(async (fastify) => {
       const voice = VOICE;
       const instructions = SYSTEM_MESSAGE;
 
-      // CORRECT session format - NO TYPE FIELD IN SESSION OBJECT
+      // CORRECT session format - ADDING REQUIRED TYPE FIELD
       const sessionData = {
+        type: "ephemeral",
         modalities: ["text", "audio"],
         instructions: instructions,
         voice: voice,
