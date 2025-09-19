@@ -3,16 +3,18 @@
   "version": "1.0.0",
   "description": "Node.js server bridging Twilio and OpenAI Realtime API",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "ws": "^8.16.0",
+    "@fastify/formbody": "^8.0.0",
+    "@fastify/websocket": "^11.0.0",
     "@supabase/supabase-js": "^2.57.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.4.5",
+    "fastify": "^5.0.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
