@@ -104,6 +104,7 @@ export class RealtimeChat {
           console.log("Received from Railway:", data);
           
           if (data.event === 'media' && data.media?.payload) {
+            console.log("🎵 Received audio data, payload length:", data.media.payload.length);
             // Handle audio data from Railway server
             this.playAudioFromBase64(data.media.payload);
           }
@@ -196,7 +197,18 @@ export class RealtimeChat {
 
   private async playAudioFromBase64(base64Audio: string) {
     try {
-      if (!this.audioContext) return;
+      if (!this.audioContext) {
+        console.error('No audio context available');
+        return;
+      }
+
+      // Resume audio context if suspended (browser requirement)
+      if (this.audioContext.state === 'suspended') {
+        console.log('Resuming audio context...');
+        await this.audioContext.resume();
+      }
+      
+      console.log('🎵 Playing audio chunk, base64 length:', base64Audio.length);
       
       // Decode base64 to u-law data
       const binaryString = atob(base64Audio);
@@ -204,6 +216,8 @@ export class RealtimeChat {
       for (let i = 0; i < binaryString.length; i++) {
         ulawArray[i] = binaryString.charCodeAt(i);
       }
+      
+      console.log('Decoded u-law array length:', ulawArray.length);
       
       // Convert u-law to linear PCM
       const pcmArray = new Float32Array(ulawArray.length);
@@ -218,7 +232,13 @@ export class RealtimeChat {
       const source = this.audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(this.audioContext.destination);
+      
+      source.onended = () => {
+        console.log('Audio chunk finished playing');
+      };
+      
       source.start();
+      console.log('Started playing audio chunk');
       
     } catch (error) {
       console.error('Error playing audio:', error);
