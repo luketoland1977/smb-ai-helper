@@ -259,18 +259,13 @@ serve(async (req) => {
         const tokenData = await tokenResponse.json();
         console.log('Got ephemeral token for attempt:', connectionAttempts);
         
-        // Connect to OpenAI Realtime API with proper WebSocket headers in Deno
-        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
-        console.log('Connecting to OpenAI WebSocket with proper headers');
+        // Connect to OpenAI Realtime API using URL-based authentication
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&access_token=${tokenData.client_secret.value}`;
+        console.log('Connecting to OpenAI WebSocket with URL-based authentication');
         console.log('Using ephemeral token:', tokenData.client_secret.value.substring(0, 10) + '...');
         
-        // Create WebSocket with proper header format for Deno
-        openAISocket = new WebSocket(wsUrl, {
-          headers: {
-            "Authorization": `Bearer ${tokenData.client_secret.value}`,
-            "OpenAI-Beta": "realtime=v1",
-          },
-        });
+        // Create WebSocket without headers - use URL-based auth instead
+        openAISocket = new WebSocket(wsUrl);
         
         console.log('WebSocket created with Authorization header');
         
