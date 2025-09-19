@@ -201,11 +201,20 @@ fastify.register(async (fastify) => {
       try {
         const response = JSON.parse(data);
 
+        console.log(`📥 OpenAI Event: ${response.type}`, {
+          type: response.type,
+          hasAudio: Boolean(response.delta),
+          itemId: response.item_id,
+          timestamp: new Date().toISOString()
+        });
+
         if (LOG_EVENT_TYPES.includes(response.type)) {
           console.log(`Received event: ${response.type}`, response);
         }
 
         if (response.type === 'response.audio.delta' && response.delta) {
+          console.log(`🎵 Sending audio delta to Twilio, length: ${response.delta.length}`);
+          
           const audioDelta = {
             event: 'media',
             streamSid: streamSid,
@@ -216,6 +225,7 @@ fastify.register(async (fastify) => {
           // First delta from a new response starts the elapsed time counter
           if (!responseStartTimestampTwilio) {
             responseStartTimestampTwilio = latestMediaTimestamp;
+            console.log(`⏱️ Starting response timer at: ${responseStartTimestampTwilio}ms`);
             if (SHOW_TIMING_MATH) console.log(`Setting start timestamp for new response: ${responseStartTimestampTwilio}ms`);
           }
 
@@ -227,7 +237,19 @@ fastify.register(async (fastify) => {
         }
 
         if (response.type === 'input_audio_buffer.speech_started') {
+          console.log('🎤 User started speaking - handling interruption');
           handleSpeechStartedEvent();
+        }
+
+        if (response.type === 'response.created') {
+          console.log('🤖 OpenAI response started');
+        }
+
+        if (response.type === 'response.done') {
+          console.log('✅ OpenAI response completed', {
+            status: response.response?.status,
+            output_count: response.response?.output?.length || 0
+          });
         }
       } catch (error) {
         console.error('Error processing OpenAI message:', error, 'Raw message:', data);
@@ -242,6 +264,7 @@ fastify.register(async (fastify) => {
         switch (data.event) {
           case 'media':
             latestMediaTimestamp = data.media.timestamp;
+            console.log(`🎙️ Received audio from Twilio, timestamp: ${latestMediaTimestamp}ms`);
             if (SHOW_TIMING_MATH) console.log(`Received media message with timestamp: ${latestMediaTimestamp}ms`);
             if (openAiWs.readyState === WebSocket.OPEN) {
               const audioAppend = {
@@ -249,6 +272,9 @@ fastify.register(async (fastify) => {
                 audio: data.media.payload
               };
               openAiWs.send(JSON.stringify(audioAppend));
+              console.log(`📤 Sent audio to OpenAI, payload length: ${data.media.payload.length}`);
+            } else {
+              console.log('⚠️ OpenAI WebSocket not ready, dropping audio');
             }
             break;
           case 'start':
