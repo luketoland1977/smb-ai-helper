@@ -119,7 +119,7 @@ fastify.register(async (fastify) => {
         },
       };
 
-      console.log('Sending session update:', JSON.stringify(sessionUpdate));
+      console.log('🚀 FIXED VERSION - Sending session update:', JSON.stringify(sessionUpdate));
       openAiWs.send(JSON.stringify(sessionUpdate));
 
       // Uncomment to have AI speak first:
