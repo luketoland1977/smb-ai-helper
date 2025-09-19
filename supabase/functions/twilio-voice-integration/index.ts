@@ -89,10 +89,27 @@ serve(async (req) => {
   if (url.pathname === '/incoming-call' || url.pathname.endsWith('/incoming-call')) {
     console.log('Incoming call webhook received');
     
+    // Parse form data from Twilio webhook
+    let formData: any = {};
+    try {
+      if (req.method === 'POST') {
+        const body = await req.text();
+        const params = new URLSearchParams(body);
+        formData = Object.fromEntries(params.entries());
+        console.log('Twilio webhook data:', formData);
+      }
+    } catch (error) {
+      console.error('Error parsing webhook data:', error);
+    }
+    
+    const callSid = formData.CallSid || 'unknown';
+    const from = formData.From || 'unknown';
+    const to = formData.To || 'unknown';
+    
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-integration" />
+    <Stream url="wss://ycvvuepfsebqpwmamqgg.supabase.co/functions/v1/twilio-voice-integration?callSid=${encodeURIComponent(callSid)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}" />
   </Connect>
 </Response>`;
     
@@ -280,35 +297,62 @@ serve(async (req) => {
         console.log('Got ephemeral token for attempt:', connectionAttempts);
         console.log('Using ephemeral token:', tokenData.client_secret.value.substring(0, 10) + '...');
         
-        // Connect to OpenAI Realtime API with proper WebSocket URL format
+        // Connect to OpenAI Realtime API with ephemeral token
         const wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`;
-        console.log('Connecting to OpenAI WebSocket with proper headers');
+        console.log('Connecting to OpenAI WebSocket with ephemeral token');
         
-        // Create WebSocket with authorization header
-        openAISocket = new WebSocket(wsUrl, {
-          headers: {
-            'Authorization': `Bearer ${tokenData.client_secret.value}`,
-            'OpenAI-Beta': 'realtime=v1'
-          }
-        });
+        // Create WebSocket connection with ephemeral token authentication
+        const authenticatedUrl = `${wsUrl}&authorization=Bearer%20${encodeURIComponent(tokenData.client_secret.value)}`;
+        openAISocket = new WebSocket(authenticatedUrl);
         
         openAISocket.onopen = () => {
           console.log(`OpenAI WebSocket connected successfully on attempt ${connectionAttempts}`);
-          connectionAttempts = 0; // Reset attempts on successful connection
           
-          // Start heartbeat to monitor connection health
-          if (heartbeatInterval) clearInterval(heartbeatInterval);
-          heartbeatInterval = setInterval(() => {
-            if (openAISocket && openAISocket.readyState === WebSocket.OPEN) {
-              try {
-                openAISocket.send(JSON.stringify({ type: 'ping' }));
-                console.log('Sent heartbeat ping to OpenAI');
-              } catch (error) {
-                console.error('Failed to send heartbeat:', error);
-                handleOpenAIReconnect();
+          // Send authentication with ephemeral token
+          try {
+            const authMessage = {
+              type: 'session.update',
+              session: {
+                model: 'gpt-4o-realtime-preview-2024-12-17',
+                modalities: ['text', 'audio'],
+                instructions: agentConfig?.ai_agents?.system_prompt || "You are a helpful voice assistant.",
+                voice: agentConfig?.voice_settings?.voice || "alloy",
+                input_audio_format: 'pcm16',
+                output_audio_format: 'pcm16',
+                input_audio_transcription: { model: 'whisper-1' },
+                turn_detection: {
+                  type: 'server_vad',
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 1000
+                },
+                temperature: 0.8,
               }
-            }
-          }, heartbeatIntervalMs);
+            };
+            
+            openAISocket.send(JSON.stringify(authMessage));
+            console.log('Sent session configuration to OpenAI');
+            sessionReady = true;
+            connectionAttempts = 0; // Reset attempts on successful connection
+            
+            // Start heartbeat to monitor connection health
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            heartbeatInterval = setInterval(() => {
+              if (openAISocket && openAISocket.readyState === WebSocket.OPEN) {
+                try {
+                  openAISocket.send(JSON.stringify({ type: 'ping' }));
+                  console.log('Sent heartbeat ping to OpenAI');
+                } catch (error) {
+                  console.error('Failed to send heartbeat:', error);
+                  handleOpenAIReconnect();
+                }
+              }
+            }, heartbeatIntervalMs);
+            
+          } catch (error) {
+            console.error('Failed to send session config:', error);
+            handleOpenAIReconnect();
+          }
         };
         
         openAISocket.onmessage = (event) => {
