@@ -336,5 +336,5 @@ fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
     console.error(err);
     process.exit(1);
   }
-  console.log(`🚨🚨🚨 CRITICAL FIX DEPLOYED - Server listening on port ${PORT} 🚨🚨🚨`);
+  console.log(`🚨🚨🚨 CRITICAL FIX DEPLOYED v2.0.1 - Server listening on port ${PORT} 🚨🚨🚨`);
 });
