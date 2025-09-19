@@ -91,15 +91,14 @@ fastify.register(async (fastify) => {
       }
     });
 
-    // Control initial session with OpenAI - COMPLETELY REWRITTEN TO FORCE DEPLOYMENT
+    // ULTIMATE FIX - REMOVING INVALID TYPE FIELD FROM SESSION OBJECT
     const initializeSession = () => {
-      console.log('🔥 INITIALIZING SESSION - NEW VERSION');
+      console.log('🎯 ULTIMATE SESSION FIX v3.0 - REMOVING TYPE FIELD');
       const voice = VOICE;
       const instructions = SYSTEM_MESSAGE;
 
-      // Build session update with REQUIRED type field
+      // CORRECT session format - NO TYPE FIELD IN SESSION OBJECT
       const sessionData = {
-        type: 'realtime', // THIS IS THE CRITICAL MISSING FIELD
         modalities: ["text", "audio"],
         instructions: instructions,
         voice: voice,
@@ -123,8 +122,8 @@ fastify.register(async (fastify) => {
         session: sessionData
       };
 
-      console.log('🆕 DEPLOYMENT TEST - Session update with type:', JSON.stringify(sessionUpdate));
-      console.log('🔍 Session object has type:', sessionUpdate.session.type);
+      console.log('✅ CORRECT SESSION FORMAT (NO TYPE IN SESSION):', JSON.stringify(sessionUpdate));
+      console.log('🚀 SENDING CORRECTED SESSION UPDATE');
       openAiWs.send(JSON.stringify(sessionUpdate));
 
       // Uncomment to have AI speak first:
@@ -336,5 +335,5 @@ fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
     console.error(err);
     process.exit(1);
   }
-  console.log(`🚨🚨🚨 CRITICAL FIX DEPLOYED v2.0.1 - Server listening on port ${PORT} 🚨🚨🚨`);
+  console.log(`💥💥💥 ULTIMATE SESSION FIX v3.0.0 DEPLOYED - Server on port ${PORT} 💥💥💥`);
 });

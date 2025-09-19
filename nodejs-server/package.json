@@ -1,11 +1,11 @@
 {
-  "name": "twilio-openai-voice-server-fixed",
-  "version": "2.0.1-FORCE-DEPLOY",
+  "name": "twilio-openai-voice-server-ultimate-fix",
+  "version": "3.0.0-ULTIMATE-SESSION-FIX",
   "description": "Node.js server bridging Twilio and OpenAI Realtime API",
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "echo '🚨 STARTING FIXED VERSION 2.0.1 🚨' && node server.js",
+    "start": "echo '💥 ULTIMATE FIX v3.0.0 - SESSION TYPE REMOVED 💥' && node server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
