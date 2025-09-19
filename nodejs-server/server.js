@@ -99,6 +99,7 @@ fastify.register(async (fastify) => {
       const sessionUpdate = {
         type: 'session.update',
         session: {
+          type: 'realtime',
           modalities: ["text", "audio"],
           instructions: instructions,
           voice: voice,
