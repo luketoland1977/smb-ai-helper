@@ -3,31 +3,18 @@ import WebSocket from 'ws';
 import dotenv from 'dotenv';
 import fastifyFormBody from '@fastify/formbody';
 import fastifyWs from '@fastify/websocket';
-import { createClient } from '@supabase/supabase-js';
 
 // Load environment variables from .env file
 dotenv.config();
 
-// Retrieve environment variables
-const { 
-  OPENAI_API_KEY, 
-  SUPABASE_URL, 
-  SUPABASE_SERVICE_ROLE_KEY,
-  PORT = 3001 
-} = process.env;
+// Retrieve the OpenAI API key from environment variables.
+const { OPENAI_API_KEY } = process.env;
+const PORT = process.env.PORT || 3001;
 
 if (!OPENAI_API_KEY) {
   console.error('Missing OpenAI API key. Please set it in the .env file.');
   process.exit(1);
 }
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('Missing Supabase credentials. Please set them in the .env file.');
-  process.exit(1);
-}
-
-// Initialize Supabase client
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Initialize Fastify
 const fastify = Fastify();
@@ -35,8 +22,9 @@ fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
 // Constants
-const DEFAULT_VOICE = 'alloy';
-const DEFAULT_TEMPERATURE = 0.8;
+const SYSTEM_MESSAGE = 'You are a helpful and bubbly AI assistant who loves to chat about anything the user is interested about and is prepared to offer them facts. You have a penchant for dad jokes, owl jokes, and rickrolling – subtly. Always stay positive, but work in a joke when appropriate.';
+const VOICE = 'alloy';
+const TEMPERATURE = 0.8;
 
 // List of Event Types to log to the console
 const LOG_EVENT_TYPES = [
@@ -64,29 +52,6 @@ fastify.get('/health', async (request, reply) => {
   reply.send({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Function to fetch agent configuration from Supabase
-async function getAgentConfig(toPhoneNumber) {
-  try {
-    console.log(`Fetching agent config for phone number: ${toPhoneNumber}`);
-    
-    const { data: agent, error } = await supabase
-      .from('agents')
-      .select('*')
-      .eq('phone_number', toPhoneNumber)
-      .single();
-
-    if (error) {
-      console.error('Error fetching agent:', error);
-      return null;
-    }
-
-    console.log('Agent config fetched:', agent);
-    return agent;
-  } catch (error) {
-    console.error('Error in getAgentConfig:', error);
-    return null;
-  }
-}
 
 // Route for Twilio to handle incoming calls
 fastify.all('/incoming-call', async (request, reply) => {
@@ -114,20 +79,17 @@ fastify.register(async (fastify) => {
     let lastAssistantItem = null;
     let markQueue = [];
     let responseStartTimestampTwilio = null;
-    let agentConfig = null;
 
-    const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`, {
+    const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&temperature=${TEMPERATURE}`, {
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
       }
     });
 
     // Control initial session with OpenAI
-    const initializeSession = async () => {
-      // Get agent configuration (you may need to extract phone number from request)
-      // For now, using default config
-      const voice = agentConfig?.voice || DEFAULT_VOICE;
-      const instructions = agentConfig?.system_prompt || 'You are a helpful and bubbly AI assistant who loves to chat about anything the user is interested about and is prepared to offer them facts. You have a penchant for dad jokes, owl jokes, and rickrolling – subtly. Always stay positive, but work in a joke when appropriate.';
+    const initializeSession = () => {
+      const voice = VOICE;
+      const instructions = SYSTEM_MESSAGE;
 
       const sessionUpdate = {
         type: 'session.update',
@@ -146,7 +108,7 @@ fastify.register(async (fastify) => {
             prefix_padding_ms: 300,
             silence_duration_ms: 1000
           },
-          temperature: DEFAULT_TEMPERATURE,
+          temperature: TEMPERATURE,
           max_response_output_tokens: "inf"
         },
       };
@@ -160,7 +122,7 @@ fastify.register(async (fastify) => {
 
     // Send initial conversation item if AI talks first
     const sendInitialConversationItem = () => {
-      const greeting = agentConfig?.first_message || 'Hello there! I am an AI voice assistant powered by Twilio and the OpenAI Realtime API. You can ask me for facts, jokes, or anything you can imagine. How can I help you?';
+      const greeting = 'Hello there! I am an AI voice assistant powered by Twilio and the OpenAI Realtime API. You can ask me for facts, jokes, or anything you can imagine. How can I help you?';
       
       const initialConversationItem = {
         type: 'conversation.item.create',
@@ -287,17 +249,6 @@ fastify.register(async (fastify) => {
           case 'start':
             streamSid = data.start.streamSid;
             console.log('Incoming stream has started', streamSid);
-
-            // Extract call details and fetch agent config
-            const callDetails = data.start;
-            const toPhoneNumber = callDetails.customParameters?.To || callDetails.to;
-            
-            if (toPhoneNumber) {
-              getAgentConfig(toPhoneNumber).then(config => {
-                agentConfig = config;
-                console.log('Agent config loaded:', agentConfig);
-              });
-            }
 
             // Reset start and media timestamp on a new stream
             responseStartTimestampTwilio = null; 
