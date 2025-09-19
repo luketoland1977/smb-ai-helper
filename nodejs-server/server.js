@@ -91,32 +91,36 @@ fastify.register(async (fastify) => {
       }
     });
 
-    // Control initial session with OpenAI
+    // Control initial session with OpenAI - COMPLETELY REWRITTEN TO FORCE DEPLOYMENT
     const initializeSession = () => {
+      console.log('🔥 INITIALIZING SESSION - NEW VERSION');
       const voice = VOICE;
       const instructions = SYSTEM_MESSAGE;
 
+      // Build session update with REQUIRED type field
+      const sessionData = {
+        type: 'realtime', // THIS IS THE CRITICAL MISSING FIELD
+        modalities: ["text", "audio"],
+        instructions: instructions,
+        voice: voice,
+        input_audio_format: "g711_ulaw",
+        output_audio_format: "g711_ulaw",
+        input_audio_transcription: {
+          model: "whisper-1"
+        },
+        turn_detection: {
+          type: "server_vad",
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 1000
+        },
+        temperature: TEMPERATURE,
+        max_response_output_tokens: "inf"
+      };
+
       const sessionUpdate = {
         type: 'session.update',
-        session: {
-          type: 'realtime',
-          modalities: ["text", "audio"],
-          instructions: instructions,
-          voice: voice,
-          input_audio_format: "g711_ulaw",
-          output_audio_format: "g711_ulaw",
-          input_audio_transcription: {
-            model: "whisper-1"
-          },
-          turn_detection: {
-            type: "server_vad",
-            threshold: 0.5,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 1000
-          },
-          temperature: TEMPERATURE,
-          max_response_output_tokens: "inf"
-        },
+        session: sessionData
       };
 
       console.log('🆕 DEPLOYMENT TEST - Session update with type:', JSON.stringify(sessionUpdate));
@@ -332,5 +336,5 @@ fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
     console.error(err);
     process.exit(1);
   }
-  console.log(`🔥 FORCE REDEPLOY v2 - Server is listening on port ${PORT}`);
+  console.log(`🚨🚨🚨 CRITICAL FIX DEPLOYED - Server listening on port ${PORT} 🚨🚨🚨`);
 });
