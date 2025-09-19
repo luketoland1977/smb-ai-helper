@@ -1,5 +1,3 @@
-import { supabase } from '@/integrations/supabase/client';
-
 export class AudioRecorder {
   private stream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
@@ -12,7 +10,7 @@ export class AudioRecorder {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 24000,
+          sampleRate: 8000, // Match Railway server's g711_ulaw format
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
@@ -21,11 +19,11 @@ export class AudioRecorder {
       });
       
       this.audioContext = new AudioContext({
-        sampleRate: 24000,
+        sampleRate: 8000, // Match g711_ulaw sample rate
       });
       
       this.source = this.audioContext.createMediaStreamSource(this.stream);
-      this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+      this.processor = this.audioContext.createScriptProcessor(320, 1, 1); // Smaller chunks for g711
       
       this.processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
@@ -61,10 +59,11 @@ export class AudioRecorder {
 }
 
 export class RealtimeChat {
-  private pc: RTCPeerConnection | null = null;
-  private dc: RTCDataChannel | null = null;
+  private ws: WebSocket | null = null;
   private audioEl: HTMLAudioElement;
   private recorder: AudioRecorder | null = null;
+  private audioContext: AudioContext | null = null;
+  private sequenceNumber = 0;
 
   constructor(private onMessage: (message: any) => void) {
     this.audioEl = document.createElement("audio");
@@ -73,69 +72,73 @@ export class RealtimeChat {
 
   async init(agentId?: string) {
     try {
-      // Get ephemeral token from our Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke("openai-realtime-token", {
-        body: { agentId }
-      });
+      // Connect to Railway server WebSocket - replace with your actual Railway URL
+      const railwayUrl = 'wss://twilio-openai-voice-server-ultimate-fix-production.up.railway.app';
+      this.ws = new WebSocket(`${railwayUrl}/media-stream`);
       
-      if (error || !data?.client_secret?.value) {
-        throw new Error("Failed to get ephemeral token: " + (error?.message || 'No token received'));
-      }
-
-      const EPHEMERAL_KEY = data.client_secret.value;
-
-      // Create peer connection
-      this.pc = new RTCPeerConnection();
-
-      // Set up remote audio
-      this.pc.ontrack = e => this.audioEl.srcObject = e.streams[0];
-
-      // Add local audio track
-      const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.pc.addTrack(ms.getTracks()[0]);
-
-      // Set up data channel
-      this.dc = this.pc.createDataChannel("oai-events");
-      this.dc.addEventListener("message", (e) => {
-        const event = JSON.parse(e.data);
-        console.log("Received event:", event);
-        this.onMessage(event);
-      });
-
-      // Create and set local description
-      const offer = await this.pc.createOffer();
-      await this.pc.setLocalDescription(offer);
-
-      // Connect to OpenAI's Realtime API
-      const baseUrl = "https://api.openai.com/v1/realtime";
-      const model = "gpt-4o-realtime-preview-2024-12-17";
-      const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
-        method: "POST",
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${EPHEMERAL_KEY}`,
-          "Content-Type": "application/sdp"
-        },
-      });
-
-      if (!sdpResponse.ok) {
-        throw new Error(`Failed to connect: ${sdpResponse.status}`);
-      }
-
-      const answer = {
-        type: "answer" as RTCSdpType,
-        sdp: await sdpResponse.text(),
+      this.ws.onopen = () => {
+        console.log("Connected to Railway server");
+        this.onMessage({ type: 'connection.established' });
+        
+        // Send Twilio-style start message
+        this.ws?.send(JSON.stringify({
+          event: 'start',
+          sequenceNumber: this.sequenceNumber++,
+          start: {
+            streamSid: 'web-stream-' + Date.now(),
+            accountSid: 'web-account',
+            callSid: 'web-call-' + Date.now(),
+            tracks: ['inbound'],
+            mediaFormat: {
+              encoding: 'audio/x-mulaw',
+              sampleRate: 8000,
+              channels: 1
+            }
+          }
+        }));
       };
-      
-      await this.pc.setRemoteDescription(answer);
-      console.log("WebRTC connection established");
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("Received from Railway:", data);
+          
+          if (data.event === 'media' && data.media?.payload) {
+            // Handle audio data from Railway server
+            this.playAudioFromBase64(data.media.payload);
+          }
+          
+          this.onMessage(data);
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        this.onMessage({ type: 'error', error: 'Connection failed' });
+      };
+
+      this.ws.onclose = () => {
+        console.log("WebSocket closed");
+        this.onMessage({ type: 'connection.closed' });
+      };
+
+      // Set up audio context for playback
+      this.audioContext = new AudioContext({ sampleRate: 8000 });
 
       // Start recording
       this.recorder = new AudioRecorder((audioData) => {
-        if (this.dc?.readyState === 'open') {
-          this.dc.send(JSON.stringify({
-            type: 'input_audio_buffer.append',
-            audio: this.encodeAudioData(audioData)
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          // Convert to g711_ulaw format and send to Railway
+          const base64Audio = this.encodeAudioForTwilio(audioData);
+          this.ws.send(JSON.stringify({
+            event: 'media',
+            sequenceNumber: this.sequenceNumber++,
+            media: {
+              timestamp: Date.now().toString(),
+              payload: base64Audio
+            }
           }));
         }
       });
@@ -147,51 +150,106 @@ export class RealtimeChat {
     }
   }
 
-  private encodeAudioData(float32Array: Float32Array): string {
-    const int16Array = new Int16Array(float32Array.length);
+  private encodeAudioForTwilio(float32Array: Float32Array): string {
+    // Convert Float32 to 16-bit PCM
+    const pcmArray = new Int16Array(float32Array.length);
     for (let i = 0; i < float32Array.length; i++) {
       const s = Math.max(-1, Math.min(1, float32Array[i]));
-      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      pcmArray[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
     
-    const uint8Array = new Uint8Array(int16Array.buffer);
-    let binary = '';
-    const chunkSize = 0x8000;
-    
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    // Convert to g711 u-law (simplified - for production use proper codec)
+    const ulawArray = new Uint8Array(pcmArray.length);
+    for (let i = 0; i < pcmArray.length; i++) {
+      ulawArray[i] = this.linearToUlaw(pcmArray[i]);
     }
     
-    return btoa(binary);
+    return btoa(String.fromCharCode.apply(null, Array.from(ulawArray)));
+  }
+
+  private linearToUlaw(sample: number): number {
+    // Simplified u-law encoding
+    const BIAS = 0x84;
+    const CLIP = 32635;
+    
+    sample = sample >> 2;
+    if (sample < 0) {
+      sample = -sample;
+      sample |= 0x8000;
+    }
+    
+    if (sample > CLIP) sample = CLIP;
+    sample += BIAS;
+    
+    let exponent = 7;
+    for (let i = 0x4000; i > 0; i >>= 1) {
+      if (sample >= i) {
+        sample -= i;
+        break;
+      }
+      exponent--;
+    }
+    
+    const mantissa = (sample >> (exponent + 3)) & 0x0F;
+    return ~(exponent << 4 | mantissa);
+  }
+
+  private async playAudioFromBase64(base64Audio: string) {
+    try {
+      if (!this.audioContext) return;
+      
+      // Decode base64 to u-law data
+      const binaryString = atob(base64Audio);
+      const ulawArray = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        ulawArray[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Convert u-law to linear PCM
+      const pcmArray = new Float32Array(ulawArray.length);
+      for (let i = 0; i < ulawArray.length; i++) {
+        pcmArray[i] = this.ulawToLinear(ulawArray[i]) / 32768.0;
+      }
+      
+      // Create audio buffer and play
+      const audioBuffer = this.audioContext.createBuffer(1, pcmArray.length, 8000);
+      audioBuffer.getChannelData(0).set(pcmArray);
+      
+      const source = this.audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.audioContext.destination);
+      source.start();
+      
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    }
+  }
+
+  private ulawToLinear(ulawByte: number): number {
+    // Simplified u-law decoding
+    ulawByte = ~ulawByte;
+    const sign = (ulawByte & 0x80) ? -1 : 1;
+    const exponent = (ulawByte >> 4) & 0x07;
+    const mantissa = ulawByte & 0x0F;
+    
+    let sample = mantissa << (exponent + 3);
+    sample += 0x84;
+    sample <<= 2;
+    
+    return sign * sample;
   }
 
   async sendMessage(text: string) {
-    if (!this.dc || this.dc.readyState !== 'open') {
-      throw new Error('Data channel not ready');
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not ready');
     }
 
-    const event = {
-      type: 'conversation.item.create',
-      item: {
-        type: 'message',
-        role: 'user',
-        content: [
-          {
-            type: 'input_text',
-            text
-          }
-        ]
-      }
-    };
-
-    this.dc.send(JSON.stringify(event));
-    this.dc.send(JSON.stringify({type: 'response.create'}));
+    // For now, just log text messages - the Railway server handles audio
+    console.log('Sending text message:', text);
   }
 
   disconnect() {
     this.recorder?.stop();
-    this.dc?.close();
-    this.pc?.close();
+    this.ws?.close();
   }
 }
