@@ -5,9 +5,10 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Clear npm cache and install dependencies
+# Install dependencies with fresh cache
 RUN npm cache clean --force && \
-    npm ci --omit=dev --no-optional
+    rm -rf node_modules package-lock.json && \
+    npm install --omit=dev --no-audit --no-fund
 
 # Copy source code
 COPY . .
