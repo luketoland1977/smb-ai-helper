@@ -55,6 +55,10 @@ fastify.get('/health', async (request, reply) => {
 
 // Route for Twilio to handle incoming calls
 fastify.all('/incoming-call', async (request, reply) => {
+  console.log('=== INCOMING CALL RECEIVED ===');
+  console.log('Headers:', request.headers);
+  console.log('Body:', request.body);
+  console.log('Host:', request.headers.host);
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                         <Response>
                             <Say voice="Google.en-US-Chirp3-HD-Aoede">Please wait while we connect your call to the A. I. voice assistant, powered by Twilio and the Open A I Realtime API</Say>
@@ -71,7 +75,8 @@ fastify.all('/incoming-call', async (request, reply) => {
 // WebSocket route for media-stream
 fastify.register(async (fastify) => {
   fastify.get('/media-stream', { websocket: true }, (connection, req) => {
-    console.log('Client connected');
+    console.log('=== MEDIA STREAM WEBSOCKET CONNECTED ===');
+    console.log('Request headers:', req.headers);
 
     // Connection-specific state
     let streamSid = null;
