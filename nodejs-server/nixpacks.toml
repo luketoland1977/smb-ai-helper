@@ -11,7 +11,7 @@ cmds = ["npm install"]
 cmds = ["echo 'No build step required'"]
 
 [start]
-cmd = "npm start"
+cmd = "node server.js"
 
 [variables]
 NPM_CONFIG_PREFER_OFFLINE = "false"
