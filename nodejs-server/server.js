@@ -42,6 +42,104 @@ const LOG_EVENT_TYPES = [
 // Show AI response elapsed timing calculations
 const SHOW_TIMING_MATH = false;
 
+// Client configuration functions
+async function loadClientConfiguration(twilioNumber, callerNumber) {
+  try {
+    console.log(`🔍 Looking up client config for Twilio number: ${twilioNumber}`);
+    
+    // Call Supabase Edge Function to load client configuration
+    const response = await fetch('https://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-client-config', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        twilioNumber,
+        callerNumber
+      })
+    });
+
+    if (!response.ok) {
+      console.log(`⚠️ No client config found (${response.status}), using defaults`);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (data.useDefault) {
+      console.log('📋 API indicates to use default configuration');
+      return null;
+    }
+
+    if (!data.success || !data.config) {
+      console.log('❌ Invalid response from client config API');
+      return null;
+    }
+
+    console.log(`✅ Client config loaded:`, {
+      clientName: data.config.clientName,
+      agentName: data.config.agentName,
+      hasCustomKey: Boolean(data.config.openaiApiKey)
+    });
+    
+    return data.config;
+  } catch (error) {
+    console.error('❌ Error loading client configuration:', error);
+    return null;
+  }
+}
+
+function getDefaultConfiguration() {
+  return {
+    clientId: 'default',
+    clientName: 'Default Configuration',
+    agentId: 'default',
+    systemPrompt: SYSTEM_MESSAGE,
+    voice: VOICE,
+    openaiApiKey: null,
+    knowledgeBase: []
+  };
+}
+
+async function searchKnowledgeBase(clientId, query) {
+  try {
+    console.log(`🔍 Searching knowledge base for client ${clientId} with query: ${query}`);
+    
+    // Call Supabase Edge Function for knowledge base search
+    const response = await fetch('https://ycvvuepfsebqpwmamqgg.functions.supabase.co/knowledge-search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        clientId,
+        query,
+        limit: 3
+      })
+    });
+
+    if (!response.ok) {
+      console.log(`⚠️ Knowledge base search failed (${response.status})`);
+      return '';
+    }
+
+    const data = await response.json();
+    
+    if (data.count > 0) {
+      console.log(`✅ Found ${data.count} knowledge base results`);
+      return data.context;
+    } else {
+      console.log('📭 No knowledge base results found');
+      return '';
+    }
+  } catch (error) {
+    console.error('❌ Error searching knowledge base:', error);
+    return '';
+  }
+}
+
 // Root Route with health info
 fastify.get('/', async (request, reply) => {
   reply.send({ 
@@ -59,28 +157,49 @@ fastify.get('/health', async (request, reply) => {
 });
 
 
-// Route for Twilio to handle incoming calls
+// Route for Twilio to handle incoming calls - Enhanced with client identification
 fastify.all('/incoming-call', async (request, reply) => {
   console.log('=== INCOMING CALL RECEIVED ===');
   console.log('Headers:', request.headers);
   console.log('Body:', request.body);
   console.log('Host:', request.headers.host);
+  
+  const { To: twilioNumber, From: callerNumber } = request.body;
+  console.log(`📞 Incoming call from ${callerNumber} to ${twilioNumber}`);
+  
+  // Create WebSocket URL with client context parameters
+  const streamUrl = `wss://${request.headers.host}/media-stream?to=${encodeURIComponent(twilioNumber)}&from=${encodeURIComponent(callerNumber)}`;
+  
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                         <Response>
-                            <Say voice="Google.en-US-Chirp3-HD-Aoede">One moment while we connect you</Say>
+                            <Say voice="Google.en-US-Chirp3-HD-Aoede">One moment while we connect you to your AI assistant</Say>
                             <Connect>
-                                <Stream url="wss://${request.headers.host}/media-stream" />
+                                <Stream url="${streamUrl}" />
                             </Connect>
                         </Response>`;
 
   reply.type('text/xml').send(twimlResponse);
 });
 
-// WebSocket route for media-stream
+// WebSocket route for media-stream - Enhanced with client-specific configuration
 fastify.register(async (fastify) => {
-  fastify.get('/media-stream', { websocket: true }, (connection, req) => {
+  fastify.get('/media-stream', { websocket: true }, async (connection, req) => {
     console.log('=== MEDIA STREAM WEBSOCKET CONNECTED ===');
     console.log('Request headers:', req.headers);
+    console.log('Query parameters:', req.query);
+    
+    // Extract client context from query parameters
+    const { to: twilioNumber, from: callerNumber } = req.query;
+    console.log(`🔍 Identifying client for call: ${callerNumber} → ${twilioNumber}`);
+    
+    // Load client-specific configuration
+    let clientConfig = await loadClientConfiguration(twilioNumber, callerNumber);
+    if (!clientConfig) {
+      console.log('⚠️ No client configuration found, using defaults');
+      clientConfig = getDefaultConfiguration();
+    } else {
+      console.log(`✅ Loaded configuration for client: ${clientConfig.clientName}`);
+    }
 
     // Connection-specific state
     let streamSid = null;
@@ -89,10 +208,14 @@ fastify.register(async (fastify) => {
     let markQueue = [];
     let responseStartTimestampTwilio = null;
 
+    // Use client-specific OpenAI API key or system default
+    const apiKey = clientConfig.openaiApiKey || OPENAI_API_KEY;
+    console.log(`🔑 Using ${clientConfig.openaiApiKey ? 'client-specific' : 'system'} OpenAI API key`);
+    
     console.log('🚀 Creating OpenAI WebSocket connection...');
     const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`, {
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'OpenAI-Beta': 'realtime=v1'
       }
     });
@@ -105,16 +228,17 @@ fastify.register(async (fastify) => {
       }
     }, 10000); // 10 second timeout
 
-    // FIXED AUDIO FORMAT CONFIGURATION FOR TWILIO COMPATIBILITY
+    // FIXED AUDIO FORMAT CONFIGURATION FOR TWILIO COMPATIBILITY - Enhanced with client config
     const initializeSession = () => {
-      console.log('🎯 SESSION INIT v5.0 - CONFIGURING AUDIO FORMATS FOR TWILIO');
+      console.log(`🎯 SESSION INIT v6.0 - Client: ${clientConfig.clientName}`);
+      console.log('🔧 CONFIGURING AUDIO FORMATS FOR TWILIO WITH CLIENT-SPECIFIC SETTINGS');
       
       const sessionUpdate = {
         type: 'session.update',
         session: {
           modalities: ['text', 'audio'],
-          instructions: 'pmpt_68c50f2852548197b42ccce02443ea1804c7524836544f5a',
-          voice: 'sage',
+          instructions: clientConfig.systemPrompt,
+          voice: clientConfig.voice,
           input_audio_format: 'g711_ulaw',
           output_audio_format: 'g711_ulaw',
           input_audio_transcription: {
@@ -131,7 +255,8 @@ fastify.register(async (fastify) => {
         }
       };
 
-      console.log('📤 Sending session configuration with g711_ulaw format');
+      console.log(`📤 Sending session configuration for client: ${clientConfig.clientName}`);
+      console.log(`🎭 Voice: ${clientConfig.voice}, Custom prompt: ${clientConfig.systemPrompt.substring(0, 50)}...`);
       openAiWs.send(JSON.stringify(sessionUpdate));
       
       // Send initial greeting immediately after session configuration

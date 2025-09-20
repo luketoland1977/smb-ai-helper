@@ -21,6 +21,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          openai_api_key: string | null
           settings: Json | null
           status: Database["public"]["Enums"]["agent_status"] | null
           system_prompt: string | null
@@ -32,6 +33,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          openai_api_key?: string | null
           settings?: Json | null
           status?: Database["public"]["Enums"]["agent_status"] | null
           system_prompt?: string | null
@@ -43,6 +45,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          openai_api_key?: string | null
           settings?: Json | null
           status?: Database["public"]["Enums"]["agent_status"] | null
           system_prompt?: string | null
@@ -708,6 +711,7 @@ export type Database = {
           updated_at: string
           voice_enabled: boolean
           voice_settings: Json | null
+          webhook_url: string | null
         }
         Insert: {
           account_sid: string
@@ -721,6 +725,7 @@ export type Database = {
           updated_at?: string
           voice_enabled?: boolean
           voice_settings?: Json | null
+          webhook_url?: string | null
         }
         Update: {
           account_sid?: string
@@ -734,6 +739,7 @@ export type Database = {
           updated_at?: string
           voice_enabled?: boolean
           voice_settings?: Json | null
+          webhook_url?: string | null
         }
         Relationships: [
           {
