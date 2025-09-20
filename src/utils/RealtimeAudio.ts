@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export class AudioRecorder {
   private stream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
@@ -10,7 +12,7 @@ export class AudioRecorder {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 8000, // Match Railway server's g711_ulaw format
+          sampleRate: 24000, // OpenAI expects 24kHz
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
@@ -19,11 +21,11 @@ export class AudioRecorder {
       });
       
       this.audioContext = new AudioContext({
-        sampleRate: 8000, // Match g711_ulaw sample rate
+        sampleRate: 24000, // OpenAI standard sample rate
       });
       
       this.source = this.audioContext.createMediaStreamSource(this.stream);
-      this.processor = this.audioContext.createScriptProcessor(320, 1, 1); // Smaller chunks for g711
+      this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
       
       this.processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
@@ -72,28 +74,45 @@ export class RealtimeChat {
 
   async init(agentId?: string) {
     try {
-      // Connect to Railway server WebSocket - replace with your actual Railway URL
-      const railwayUrl = 'wss://twilio-openai-voice-server-ultimate-fix-production.up.railway.app';
-      this.ws = new WebSocket(`${railwayUrl}/media-stream`);
+      // Get ephemeral token from Supabase edge function
+      const { data: tokenData, error } = await supabase.functions.invoke('openai-realtime-token', {
+        body: { agentId }
+      });
+
+      if (error || !tokenData?.client_secret?.value) {
+        throw new Error('Failed to get OpenAI token: ' + (error?.message || 'No token received'));
+      }
+
+      const ephemeralToken = tokenData.client_secret.value;
+      console.log("Got ephemeral token, connecting to OpenAI directly");
+
+      // Connect directly to OpenAI WebSocket (use ephemeral token in URL)
+      this.ws = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&authorization=Bearer%20${encodeURIComponent(ephemeralToken)}`);
       
       this.ws.onopen = () => {
-        console.log("Connected to Railway server");
+        console.log("Connected to OpenAI Realtime API");
         this.onMessage({ type: 'connection.established' });
         
-        // Send Twilio-style start message
+        // Send session update with correct format for web app
         this.ws?.send(JSON.stringify({
-          event: 'start',
-          sequenceNumber: this.sequenceNumber++,
-          start: {
-            streamSid: 'web-stream-' + Date.now(),
-            accountSid: 'web-account',
-            callSid: 'web-call-' + Date.now(),
-            tracks: ['inbound'],
-            mediaFormat: {
-              encoding: 'audio/x-mulaw',
-              sampleRate: 8000,
-              channels: 1
-            }
+          type: 'session.update',
+          session: {
+            modalities: ['text', 'audio'],
+            instructions: "You are a helpful AI assistant. Respond naturally and conversationally.",
+            voice: 'alloy',
+            input_audio_format: 'pcm16',
+            output_audio_format: 'pcm16',
+            input_audio_transcription: {
+              model: 'whisper-1'
+            },
+            turn_detection: {
+              type: 'server_vad',
+              threshold: 0.5,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 1000
+            },
+            temperature: 0.8,
+            max_response_output_tokens: 'inf'
           }
         }));
       };
@@ -101,12 +120,17 @@ export class RealtimeChat {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log("Received from Railway:", data);
+          console.log("Received from OpenAI:", data.type);
           
-          if (data.event === 'media' && data.media?.payload) {
-            console.log("🎵 Received audio data, payload length:", data.media.payload.length);
-            // Handle audio data from Railway server
-            this.playAudioFromBase64(data.media.payload);
+          if (data.type === 'response.audio.delta' && data.delta) {
+            console.log("🎵 Received audio delta, length:", data.delta.length);
+            this.playAudioFromBase64(data.delta);
+          } else if (data.type === 'input_audio_buffer.speech_started') {
+            this.onMessage({ type: 'speaking', isSpeaking: true });
+          } else if (data.type === 'input_audio_buffer.speech_stopped') {
+            this.onMessage({ type: 'speaking', isSpeaking: false });
+          } else if (data.type === 'response.audio_transcript.delta') {
+            this.onMessage({ type: 'transcript', text: data.delta });
           }
           
           this.onMessage(data);
@@ -125,21 +149,17 @@ export class RealtimeChat {
         this.onMessage({ type: 'connection.closed' });
       };
 
-      // Set up audio context for playback
-      this.audioContext = new AudioContext({ sampleRate: 8000 });
+      // Set up audio context for playback (24kHz for OpenAI)
+      this.audioContext = new AudioContext({ sampleRate: 24000 });
 
       // Start recording
       this.recorder = new AudioRecorder((audioData) => {
         if (this.ws?.readyState === WebSocket.OPEN) {
-          // Convert to g711_ulaw format and send to Railway
-          const base64Audio = this.encodeAudioForTwilio(audioData);
+          // Convert to PCM16 format for OpenAI
+          const base64Audio = this.encodeAudioForOpenAI(audioData);
           this.ws.send(JSON.stringify({
-            event: 'media',
-            sequenceNumber: this.sequenceNumber++,
-            media: {
-              timestamp: Date.now().toString(),
-              payload: base64Audio
-            }
+            type: 'input_audio_buffer.append',
+            audio: base64Audio
           }));
         }
       });
@@ -151,48 +171,25 @@ export class RealtimeChat {
     }
   }
 
-  private encodeAudioForTwilio(float32Array: Float32Array): string {
-    // Convert Float32 to 16-bit PCM
-    const pcmArray = new Int16Array(float32Array.length);
+  private encodeAudioForOpenAI(float32Array: Float32Array): string {
+    // Convert Float32 to 16-bit PCM for OpenAI
+    const int16Array = new Int16Array(float32Array.length);
     for (let i = 0; i < float32Array.length; i++) {
       const s = Math.max(-1, Math.min(1, float32Array[i]));
-      pcmArray[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
     
-    // Convert to g711 u-law (simplified - for production use proper codec)
-    const ulawArray = new Uint8Array(pcmArray.length);
-    for (let i = 0; i < pcmArray.length; i++) {
-      ulawArray[i] = this.linearToUlaw(pcmArray[i]);
+    // Convert to base64
+    const uint8Array = new Uint8Array(int16Array.buffer);
+    let binary = '';
+    const chunkSize = 0x8000;
+    
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
     }
     
-    return btoa(String.fromCharCode.apply(null, Array.from(ulawArray)));
-  }
-
-  private linearToUlaw(sample: number): number {
-    // Simplified u-law encoding
-    const BIAS = 0x84;
-    const CLIP = 32635;
-    
-    sample = sample >> 2;
-    if (sample < 0) {
-      sample = -sample;
-      sample |= 0x8000;
-    }
-    
-    if (sample > CLIP) sample = CLIP;
-    sample += BIAS;
-    
-    let exponent = 7;
-    for (let i = 0x4000; i > 0; i >>= 1) {
-      if (sample >= i) {
-        sample -= i;
-        break;
-      }
-      exponent--;
-    }
-    
-    const mantissa = (sample >> (exponent + 3)) & 0x0F;
-    return ~(exponent << 4 | mantissa);
+    return btoa(binary);
   }
 
   private async playAudioFromBase64(base64Audio: string) {
@@ -210,24 +207,28 @@ export class RealtimeChat {
       
       console.log('🎵 Playing audio chunk, base64 length:', base64Audio.length);
       
-      // Decode base64 to u-law data
+      // Decode base64 to PCM16 data
       const binaryString = atob(base64Audio);
-      const ulawArray = new Uint8Array(binaryString.length);
+      const uint8Array = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
-        ulawArray[i] = binaryString.charCodeAt(i);
+        uint8Array[i] = binaryString.charCodeAt(i);
       }
       
-      console.log('Decoded u-law array length:', ulawArray.length);
+      // Convert bytes to 16-bit samples (little-endian)
+      const int16Array = new Int16Array(uint8Array.length / 2);
+      for (let i = 0; i < uint8Array.length; i += 2) {
+        int16Array[i / 2] = (uint8Array[i + 1] << 8) | uint8Array[i];
+      }
       
-      // Convert u-law to linear PCM
-      const pcmArray = new Float32Array(ulawArray.length);
-      for (let i = 0; i < ulawArray.length; i++) {
-        pcmArray[i] = this.ulawToLinear(ulawArray[i]) / 32768.0;
+      // Convert to Float32 for audio buffer
+      const floatArray = new Float32Array(int16Array.length);
+      for (let i = 0; i < int16Array.length; i++) {
+        floatArray[i] = int16Array[i] / 32768.0;
       }
       
       // Create audio buffer and play
-      const audioBuffer = this.audioContext.createBuffer(1, pcmArray.length, 8000);
-      audioBuffer.getChannelData(0).set(pcmArray);
+      const audioBuffer = this.audioContext.createBuffer(1, floatArray.length, 24000);
+      audioBuffer.getChannelData(0).set(floatArray);
       
       const source = this.audioContext.createBufferSource();
       source.buffer = audioBuffer;
@@ -243,20 +244,6 @@ export class RealtimeChat {
     } catch (error) {
       console.error('Error playing audio:', error);
     }
-  }
-
-  private ulawToLinear(ulawByte: number): number {
-    // Simplified u-law decoding
-    ulawByte = ~ulawByte;
-    const sign = (ulawByte & 0x80) ? -1 : 1;
-    const exponent = (ulawByte >> 4) & 0x07;
-    const mantissa = ulawByte & 0x0F;
-    
-    let sample = mantissa << (exponent + 3);
-    sample += 0x84;
-    sample <<= 2;
-    
-    return sign * sample;
   }
 
   async sendMessage(text: string) {
