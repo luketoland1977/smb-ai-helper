@@ -61,7 +61,7 @@ fastify.all('/incoming-call', async (request, reply) => {
   console.log('Host:', request.headers.host);
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                         <Response>
-                            <Say voice="Google.en-US-Chirp3-HD-Aoede">One moment while the A I agent assists you</Say>
+                            <Say voice="Google.en-US-Chirp3-HD-Aoede">Hello! I'm your AI assistant. How can I help you today?</Say>
                             <Connect>
                                 <Stream url="wss://${request.headers.host}/media-stream" />
                             </Connect>
