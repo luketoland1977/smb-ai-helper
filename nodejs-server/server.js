@@ -42,9 +42,15 @@ const LOG_EVENT_TYPES = [
 // Show AI response elapsed timing calculations
 const SHOW_TIMING_MATH = false;
 
-// Root Route
+// Root Route with health info
 fastify.get('/', async (request, reply) => {
-  reply.send({ message: 'Twilio Media Stream Server v4.0 - Session Fixed!', timestamp: new Date().toISOString() });
+  reply.send({ 
+    message: 'Twilio Media Stream Server v4.0 - Session Fixed!', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    pid: process.pid
+  });
 });
 
 // Health check endpoint
@@ -344,19 +350,64 @@ fastify.register(async (fastify) => {
   });
 });
 
-// Graceful shutdown
+// Process monitoring and graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
+  console.log('⚠️ SIGTERM received - server being terminated by platform');
+  console.log('🔍 Process info:', {
+    pid: process.pid,
+    uptime: process.uptime(),
+    memoryUsage: process.memoryUsage(),
+    cpuUsage: process.cpuUsage()
+  });
+  
+  console.log('🔄 Attempting graceful shutdown...');
   fastify.close(() => {
-    console.log('Process terminated');
+    console.log('✅ Server closed gracefully');
     process.exit(0);
   });
+  
+  // Force exit after 10 seconds if graceful shutdown fails
+  setTimeout(() => {
+    console.log('❌ Forcing shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT received (Ctrl+C)');
+  process.exit(0);
+});
+
+// Log unexpected exits
+process.on('exit', (code) => {
+  console.log(`🏁 Process exiting with code: ${code}`);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('💥 Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
 
 fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
   if (err) {
-    console.error(err);
+    console.error('❌ Failed to start server:', err);
     process.exit(1);
   }
-  console.log(`💥💥💥 ULTIMATE SESSION FIX v3.0.0 DEPLOYED - Server on port ${PORT} 💥💥💥`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 Process info:`, {
+    pid: process.pid,
+    nodeVersion: process.version,
+    platform: process.platform,
+    memory: process.memoryUsage()
+  });
+  
+  // Log server health every 30 seconds
+  setInterval(() => {
+    console.log(`💓 Health check - Uptime: ${Math.round(process.uptime())}s, Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+  }, 30000);
 });
