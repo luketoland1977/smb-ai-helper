@@ -99,7 +99,7 @@ fastify.register(async (fastify) => {
         session: {
           modalities: ['text', 'audio'],
           instructions: 'pmpt_68c50f2852548197b42ccce02443ea1804c7524836544f5a',
-          voice: 'alloy',
+          voice: 'sage',
           input_audio_format: 'g711_ulaw',
           output_audio_format: 'g711_ulaw',
           input_audio_transcription: {
