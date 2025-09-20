@@ -21,13 +21,21 @@ if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
   console.log('⚠️ System OpenAI API key not set - will use client-specific keys only');
 }
 
-// Initialize Fastify with proper logger configuration
+// Initialize Fastify with proper logger configuration  
 const fastify = Fastify({ 
   logger: true,
-  trustProxy: true // Important for Railway deployments
+  trustProxy: true, // Important for Railway deployments
+  connectionTimeout: 60000, // 60 seconds
+  keepAliveTimeout: 30000   // 30 seconds
 });
 fastify.register(fastifyFormBody);
-fastify.register(fastifyWs);
+fastify.register(fastifyWs, {
+  options: {
+    maxPayload: 1048576, // 1MB
+    compression: 'SHARED_COMPRESSOR',
+    clientTracking: true
+  }
+});
 
 // Constants
 const SYSTEM_MESSAGE = 'You are a helpful and bubbly AI assistant who loves to chat about anything the user is interested about and is prepared to offer them facts. You have a penchant for dad jokes, owl jokes, and rickrolling – subtly. Always stay positive, but work in a joke when appropriate.';
@@ -150,6 +158,17 @@ async function searchKnowledgeBase(clientId, query) {
   }
 }
 
+// Add catch-all request logger
+fastify.addHook('onRequest', async (request, reply) => {
+  console.log(`📥 Incoming ${request.method} request to: ${request.url}`);
+  console.log(`👤 User-Agent: ${request.headers['user-agent']}`);
+  if (request.url.includes('media-stream') || request.headers['user-agent']?.includes('TwilioProxy')) {
+    console.log('🎯 === TWILIO RELATED REQUEST ===');
+    console.log('📍 Full URL:', request.url);
+    console.log('🔗 All headers:', JSON.stringify(request.headers, null, 2));
+  }
+});
+
 // Root Route with health info
 fastify.get('/', async (request, reply) => {
   reply.send({ 
@@ -164,6 +183,20 @@ fastify.get('/', async (request, reply) => {
 // Health check endpoint
 fastify.get('/health', async (request, reply) => {
   reply.send({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Debug endpoint to test connectivity
+fastify.get('/test-connection', async (request, reply) => {
+  const host = request.headers.host;
+  const wsUrl = `wss://${host}/media-stream?test=true`;
+  
+  reply.send({
+    message: 'Connection test endpoint',
+    host: host,
+    wsUrl: wsUrl,
+    headers: request.headers,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Test WebSocket endpoint to verify WebSocket functionality
@@ -216,13 +249,16 @@ fastify.all('/incoming-call', async (request, reply) => {
     console.error('❌ WebSocket test error:', error);
   }
   
+  // Try using a simple WebSocket URL without query parameters first
+  const simpleStreamUrl = `wss://${host}/media-stream`;
+  
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                         <Response>
-                            <Say voice="alice">Connecting you to your AI assistant...</Say>
+                            <Say voice="alice">Connecting you to your AI assistant. Please wait while we establish the connection.</Say>
                             <Connect>
-                                <Stream url="${streamUrl}" />
+                                <Stream url="${simpleStreamUrl}" />
                             </Connect>
-                            <Pause length="60" />
+                            <Pause length="120" />
                         </Response>`;
 
   console.log('📤 Sending TwiML Response:');
@@ -232,6 +268,19 @@ fastify.all('/incoming-call', async (request, reply) => {
   console.log('✅ TwiML Response sent successfully');
 });
 
+// Add global request logging
+fastify.addHook('onRequest', async (request, reply) => {
+  if (request.url.includes('/media-stream') || request.headers['user-agent']?.includes('TwilioProxy')) {
+    console.log('🚀 === GLOBAL REQUEST HOOK ===');
+    console.log('📍 URL:', request.url);
+    console.log('🌐 Method:', request.method);
+    console.log('👤 User-Agent:', request.headers['user-agent']);
+    console.log('🔧 Upgrade header:', request.headers.upgrade);
+    console.log('🤝 Connection header:', request.headers.connection);
+    console.log('🔗 Full headers:', request.headers);
+  }
+});
+
 // Add WebSocket logging before route registration
 console.log('🔌 Registering WebSocket route: /media-stream');
 
@@ -239,15 +288,13 @@ console.log('🔌 Registering WebSocket route: /media-stream');
 fastify.register(async function (fastify) {
   // Add debug middleware for WebSocket upgrade requests
   fastify.addHook('onRequest', async (request, reply) => {
-    if (request.url.includes('/media-stream')) {
-      console.log('🔍 === WEBSOCKET REQUEST RECEIVED ===');
-      console.log('📍 URL:', request.url);
-      console.log('🔗 Headers:', request.headers);
-      console.log('📊 Query:', request.query);
-      console.log('🌐 Method:', request.method);
-      console.log('🔧 Upgrade header:', request.headers.upgrade);
-      console.log('🤝 Connection header:', request.headers.connection);
-    }
+    console.log('🎯 === FASTIFY WEBSOCKET HOOK ===');
+    console.log('📍 URL:', request.url);
+    console.log('🔗 Headers:', request.headers);
+    console.log('📊 Query:', request.query);
+    console.log('🌐 Method:', request.method);
+    console.log('🔧 Upgrade header:', request.headers.upgrade);
+    console.log('🤝 Connection header:', request.headers.connection);
   });
 
   fastify.get('/media-stream', { 
@@ -256,6 +303,9 @@ fastify.register(async function (fastify) {
       console.log('🎯 === PRE-HANDLER FOR MEDIA STREAM ===');
       console.log('📱 User-Agent:', request.headers['user-agent']);
       console.log('🔐 Authorization:', request.headers['authorization'] ? 'Present' : 'Missing');
+      console.log('🌍 Origin:', request.headers['origin']);
+      console.log('🔧 Sec-WebSocket-Protocol:', request.headers['sec-websocket-protocol']);
+      console.log('🔑 Sec-WebSocket-Key:', request.headers['sec-websocket-key']);
     }
   }, async (connection, req) => {
     console.log('🎯 === MEDIA STREAM WEBSOCKET CONNECTED ===');
