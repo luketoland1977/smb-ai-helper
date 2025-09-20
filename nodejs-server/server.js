@@ -3,18 +3,24 @@ import WebSocket from 'ws';
 import dotenv from 'dotenv';
 import fastifyFormBody from '@fastify/formbody';
 import fastifyWs from '@fastify/websocket';
+import { createClient } from '@supabase/supabase-js';
 
 // Load environment variables from .env file
 dotenv.config();
 
 // Retrieve the OpenAI API key from environment variables.
-const { OPENAI_API_KEY } = process.env;
+const { OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
 const PORT = process.env.PORT || 3001;
 
 if (!OPENAI_API_KEY) {
   console.error('Missing OpenAI API key. Please set it in the .env file.');
   process.exit(1);
 }
+
+// Initialize Supabase client
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY 
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : null;
 
 // Initialize Fastify
 const fastify = Fastify();
@@ -41,6 +47,73 @@ const LOG_EVENT_TYPES = [
 
 // Show AI response elapsed timing calculations
 const SHOW_TIMING_MATH = false;
+
+// Search knowledge base for relevant content
+async function searchKnowledgeBase(clientId, query) {
+  if (!supabase || !clientId || !query) {
+    return null;
+  }
+
+  try {
+    console.log('🔍 Searching knowledge base for client:', clientId, 'query:', query);
+    
+    // Search for relevant chunks using text similarity
+    const { data: chunks, error } = await supabase
+      .from('knowledge_base_chunks')
+      .select('content, metadata')
+      .eq('client_id', clientId)
+      .textSearch('content', query.split(' ').join(' | '))
+      .limit(3);
+
+    if (error) {
+      console.error('❌ Knowledge base search error:', error);
+      return null;
+    }
+
+    if (!chunks || chunks.length === 0) {
+      console.log('📄 No relevant knowledge base content found');
+      return null;
+    }
+
+    // Combine relevant chunks into context
+    const context = chunks
+      .map(chunk => chunk.content)
+      .join('\n\n---\n\n');
+
+    console.log('✅ Found relevant knowledge base content:', chunks.length, 'chunks');
+    return context;
+  } catch (error) {
+    console.error('❌ Error searching knowledge base:', error);
+    return null;
+  }
+}
+
+// Get client ID from phone number or session data
+async function getClientIdFromPhone(phoneNumber) {
+  if (!supabase || !phoneNumber) {
+    return null;
+  }
+
+  try {
+    // Look up client ID from Twilio integrations table using phone number
+    const { data, error } = await supabase
+      .from('twilio_integrations')
+      .select('client_id')
+      .eq('phone_number', phoneNumber)
+      .single();
+
+    if (error) {
+      console.log('📞 No client found for phone number:', phoneNumber);
+      return null;
+    }
+
+    console.log('📞 Found client ID for phone:', phoneNumber, 'client:', data.client_id);
+    return data.client_id;
+  } catch (error) {
+    console.error('❌ Error looking up client ID:', error);
+    return null;
+  }
+}
 
 // Root Route
 fastify.get('/', async (request, reply) => {
@@ -82,6 +155,9 @@ fastify.register(async (fastify) => {
     let lastAssistantItem = null;
     let markQueue = [];
     let responseStartTimestampTwilio = null;
+    let clientId = null;
+    let currentTranscription = '';
+    let knowledgeContext = null;
 
     const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`, {
       headers: {
@@ -241,6 +317,42 @@ fastify.register(async (fastify) => {
           handleSpeechStartedEvent();
         }
 
+        // Handle transcription for knowledge base search
+        if (response.type === 'conversation.item.input_audio_transcription.completed') {
+          const transcribedText = response.transcript;
+          console.log('📝 Transcription completed:', transcribedText);
+          
+          if (transcribedText && clientId) {
+            // Search knowledge base with transcribed text
+            searchKnowledgeBase(clientId, transcribedText).then((context) => {
+              if (context) {
+                knowledgeContext = context;
+                console.log('📚 Updated knowledge context for next response');
+                
+                // Update session with enhanced instructions including knowledge base context
+                const enhancedInstructions = `pmpt_68c50f2852548197b42ccce02443ea1804c7524836544f5a
+
+Additional relevant information from knowledge base:
+${context}
+
+Please use this information to provide accurate, helpful responses when relevant to the user's question.`;
+
+                const sessionUpdate = {
+                  type: 'session.update',
+                  session: {
+                    instructions: enhancedInstructions
+                  }
+                };
+                
+                openAiWs.send(JSON.stringify(sessionUpdate));
+                console.log('🔄 Updated session with knowledge base context');
+              }
+            }).catch(error => {
+              console.error('❌ Error updating knowledge context:', error);
+            });
+          }
+        }
+
         if (response.type === 'response.created') {
           console.log('🤖 OpenAI response started');
         }
@@ -280,6 +392,23 @@ fastify.register(async (fastify) => {
           case 'start':
             streamSid = data.start.streamSid;
             console.log('Incoming stream has started', streamSid);
+
+            // Try to get client ID from incoming call metadata
+            // Extract phone number from custom parameters if available
+            const callerNumber = data.start.customParameters?.From || data.start.customParameters?.from;
+            if (callerNumber) {
+              console.log('📞 Extracting client ID for caller:', callerNumber);
+              getClientIdFromPhone(callerNumber).then((foundClientId) => {
+                if (foundClientId) {
+                  clientId = foundClientId;
+                  console.log('✅ Client ID set for knowledge base:', clientId);
+                } else {
+                  console.log('📞 No client mapping found for phone number');
+                }
+              }).catch(error => {
+                console.error('❌ Error getting client ID:', error);
+              });
+            }
 
             // Reset start and media timestamp on a new stream
             responseStartTimestampTwilio = null; 
