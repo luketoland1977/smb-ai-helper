@@ -109,6 +109,9 @@ const ChatWidgetManager = () => {
     follow_up_message: '',
   });
 
+  // Form validation state
+  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+
   useEffect(() => {
     loadData();
   }, []);
@@ -338,10 +341,31 @@ const ChatWidgetManager = () => {
   };
 
   const createTwilioIntegration = async () => {
-    if (!twilioFormData.client_id || !twilioFormData.agent_id || !twilioFormData.phone_number || !twilioFormData.account_sid || !twilioFormData.auth_token) {
+    // Validate required fields
+    const errors: {[key: string]: string} = {};
+    
+    if (!twilioFormData.client_id) errors.client_id = 'Please select a client';
+    if (!twilioFormData.agent_id) errors.agent_id = 'Please select an agent';
+    if (!twilioFormData.phone_number) errors.phone_number = 'Phone number is required';
+    if (!twilioFormData.account_sid) errors.account_sid = 'Twilio Account SID is required';
+    if (!twilioFormData.auth_token) errors.auth_token = 'Twilio Auth Token is required';
+    
+    // Validate phone number format
+    if (twilioFormData.phone_number && !twilioFormData.phone_number.match(/^\+[1-9]\d{1,14}$/)) {
+      errors.phone_number = 'Phone number must be in E.164 format (e.g., +1234567890)';
+    }
+    
+    // Validate Account SID format
+    if (twilioFormData.account_sid && !twilioFormData.account_sid.match(/^AC[a-f0-9]{32}$/)) {
+      errors.account_sid = 'Account SID must start with "AC" followed by 32 characters';
+    }
+
+    setFormErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: "Validation Error",
+        description: "Please fix the highlighted fields",
         variant: "destructive",
       });
       return;
@@ -377,10 +401,20 @@ const ChatWidgetManager = () => {
 
       toast({
         title: "Phone Integration Created",
-        description: `Phone integration configured for ${twilioFormData.phone_number}`,
+        description: (
+          <div className="space-y-2">
+            <p>Phone integration configured for {twilioFormData.phone_number}</p>
+            <p className="text-xs bg-blue-50 p-2 rounded">
+              📞 Don't forget to configure webhooks in your Twilio Console!<br/>
+              Voice URL: {generateWebhookUrls().voice}<br/>
+              SMS URL: {generateWebhookUrls().sms}
+            </p>
+          </div>
+        ),
       });
 
-      // Refresh data
+      // Clear form errors and data
+      setFormErrors({});
       loadData();
       setShowTwilioForm(false);
       setTwilioFormData({
@@ -913,63 +947,87 @@ const ChatWidgetManager = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="twilio-client">Client</Label>
+                      <Label htmlFor="twilio-client">Client *</Label>
                       <select
                         id="twilio-client"
                         value={twilioFormData.client_id}
                         onChange={(e) => setTwilioFormData({...twilioFormData, client_id: e.target.value})}
-                        className="w-full p-2 border rounded"
+                        className={`w-full p-2 border rounded ${formErrors.client_id ? "border-red-500" : ""}`}
                       >
                         <option value="">Select a client</option>
                         {clients.map(client => (
                           <option key={client.id} value={client.id}>{client.name}</option>
                         ))}
                       </select>
+                      {formErrors.client_id && (
+                        <p className="text-red-500 text-xs mt-1">{formErrors.client_id}</p>
+                      )}
                     </div>
                     <div>
-                      <Label htmlFor="twilio-agent">AI Agent</Label>
+                      <Label htmlFor="twilio-agent">AI Agent *</Label>
                       <select
                         id="twilio-agent"
                         value={twilioFormData.agent_id}
                         onChange={(e) => setTwilioFormData({...twilioFormData, agent_id: e.target.value})}
-                        className="w-full p-2 border rounded"
+                        className={`w-full p-2 border rounded ${formErrors.agent_id ? "border-red-500" : ""}`}
                       >
                         <option value="">Select an agent</option>
                         {agents.filter(agent => agent.client_id === twilioFormData.client_id).map(agent => (
                           <option key={agent.id} value={agent.id}>{agent.name}</option>
                         ))}
                       </select>
+                      {formErrors.agent_id && (
+                        <p className="text-red-500 text-xs mt-1">{formErrors.agent_id}</p>
+                      )}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <Label htmlFor="account-sid">Twilio Account SID</Label>
+                      <Label htmlFor="account-sid">Twilio Account SID *</Label>
                       <Input
                         id="account-sid"
                         placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                         value={twilioFormData.account_sid}
                         onChange={(e) => setTwilioFormData({...twilioFormData, account_sid: e.target.value})}
+                        className={formErrors.account_sid ? "border-red-500" : ""}
                       />
+                      {formErrors.account_sid && (
+                        <p className="text-red-500 text-xs mt-1">{formErrors.account_sid}</p>
+                      )}
                     </div>
                     <div>
-                      <Label htmlFor="auth-token">Twilio Auth Token</Label>
+                      <Label htmlFor="auth-token">Twilio Auth Token *</Label>
                       <Input
                         id="auth-token"
                         type="password"
                         placeholder="Enter your Twilio Auth Token"
                         value={twilioFormData.auth_token}
                         onChange={(e) => setTwilioFormData({...twilioFormData, auth_token: e.target.value})}
+                        className={formErrors.auth_token ? "border-red-500" : ""}
                       />
+                      {formErrors.auth_token && (
+                        <p className="text-red-500 text-xs mt-1">{formErrors.auth_token}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ⚠️ Keep this secure! Find it in Twilio Console → Settings → API Keys & Tokens
+                      </p>
                     </div>
                     <div>
-                      <Label htmlFor="phone-number">Phone Number</Label>
+                      <Label htmlFor="phone-number">Phone Number *</Label>
                       <Input
                         id="phone-number"
                         placeholder="+1234567890"
                         value={twilioFormData.phone_number}
                         onChange={(e) => setTwilioFormData({...twilioFormData, phone_number: e.target.value})}
+                        className={formErrors.phone_number ? "border-red-500" : ""}
                       />
+                      {formErrors.phone_number && (
+                        <p className="text-red-500 text-xs mt-1">{formErrors.phone_number}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Must be in E.164 format (e.g., +1234567890)
+                      </p>
                     </div>
                   </div>
 
