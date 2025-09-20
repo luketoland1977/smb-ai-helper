@@ -9,7 +9,7 @@ dotenv.config();
 
 // Retrieve the OpenAI API key from environment variables.
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000; // Railway uses port 3000 by default
 
 console.log('🔑 Environment check:');
 console.log(`  - PORT: ${PORT}`);
@@ -166,6 +166,36 @@ fastify.get('/health', async (request, reply) => {
   reply.send({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// Test WebSocket endpoint to verify WebSocket functionality
+fastify.register(async function (fastify) {
+  fastify.get('/ws-test', { websocket: true }, (connection, req) => {
+    console.log('🧪 Test WebSocket connected successfully!');
+    connection.send('Hello from Railway WebSocket!');
+    
+    connection.on('message', (message) => {
+      console.log('🧪 Test WebSocket received:', message.toString());
+      connection.send(`Echo: ${message}`);
+    });
+    
+    connection.on('close', () => {
+      console.log('🧪 Test WebSocket disconnected');
+    });
+  });
+});
+
+// WebSocket test endpoint
+fastify.register(async function (fastify) {
+  fastify.get('/ws-test', { websocket: true }, (connection, req) => {
+    console.log('🧪 Test WebSocket connected');
+    connection.send('Hello from WebSocket!');
+    
+    connection.on('message', (message) => {
+      console.log('🧪 Test WebSocket received:', message.toString());
+      connection.send(`Echo: ${message}`);
+    });
+  });
+});
+
 
 // Route for Twilio to handle incoming calls - Enhanced with client identification
 fastify.all('/incoming-call', async (request, reply) => {
@@ -196,10 +226,11 @@ fastify.all('/incoming-call', async (request, reply) => {
   console.log('✅ TwiML Response sent successfully');
 });
 
+// Add WebSocket logging before route registration
+console.log('🔌 Registering WebSocket route: /media-stream');
+
 // WebSocket route for media-stream - Enhanced with client-specific configuration
 fastify.register(async function (fastify) {
-  console.log('🔌 Registering WebSocket route: /media-stream');
-  
   fastify.get('/media-stream', { websocket: true }, async (connection, req) => {
     console.log('=== MEDIA STREAM WEBSOCKET CONNECTED ===');
     console.log('Request headers:', req.headers);
