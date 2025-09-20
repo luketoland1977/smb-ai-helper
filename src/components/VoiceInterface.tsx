@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { RealtimeChat } from '@/utils/RealtimeAudio';
+import { RealtimeChat } from '@/utils/RealtimeWebRTC';
 import { Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 
 interface VoiceInterfaceProps {
@@ -26,8 +26,20 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ agentId, onSpeakingChan
     } else if (event.type === 'response.audio.done') {
       setIsSpeaking(false);
       onSpeakingChange?.(false);
-    } else if (event.type === 'conversation.item.created') {
-      console.log('Item created:', event);
+    } else if (event.type === 'input_audio_buffer.speech_started') {
+      console.log('User started speaking');
+    } else if (event.type === 'input_audio_buffer.speech_stopped') {
+      console.log('User stopped speaking');
+    } else if (event.type === 'connection.established') {
+      console.log('Connection established successfully');
+    } else if (event.type === 'error') {
+      console.error('Chat error:', event.error);
+      endConversation();
+      toast({
+        title: "Connection Error",
+        description: event.error || "Failed to maintain connection",
+        variant: "destructive",
+      });
     }
   };
 

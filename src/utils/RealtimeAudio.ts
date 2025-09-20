@@ -86,14 +86,16 @@ export class RealtimeChat {
       const ephemeralToken = tokenData.client_secret.value;
       console.log("Got ephemeral token, connecting to OpenAI directly");
 
-      // Connect directly to OpenAI WebSocket (use ephemeral token in URL)
-      this.ws = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&authorization=Bearer%20${encodeURIComponent(ephemeralToken)}`);
+      // Connect directly to OpenAI WebSocket 
+      // Note: Browser WebSocket doesn't support custom headers, so we need to use a different approach
+      // We'll connect and send auth in the first message
+      this.ws = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17');
       
       this.ws.onopen = () => {
         console.log("Connected to OpenAI Realtime API");
         this.onMessage({ type: 'connection.established' });
         
-        // Send session update with correct format for web app
+        // Send authentication message immediately after connection
         this.ws?.send(JSON.stringify({
           type: 'session.update',
           session: {
