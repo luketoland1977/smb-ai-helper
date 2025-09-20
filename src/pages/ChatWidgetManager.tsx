@@ -200,8 +200,8 @@ const ChatWidgetManager = () => {
 
   const generateWebhookUrls = () => {
     return {
-      voice: 'https://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-voice-integration/incoming-call',
-      sms: 'https://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-sms-webhook'
+      voice: 'https://nodejs-production-3c84.up.railway.app/incoming-call',
+      sms: 'https://ycvvuepfsebqpwmamqgg.functions.supabase.co/functions/v1/twilio-sms-webhook'
     };
   };
 
@@ -347,6 +347,9 @@ const ChatWidgetManager = () => {
       return;
     }
 
+    // Generate webhook URLs
+    const webhookUrls = generateWebhookUrls();
+
     try {
       const { data, error } = await supabase
         .from('twilio_integrations')
@@ -356,13 +359,15 @@ const ChatWidgetManager = () => {
           account_sid: twilioFormData.account_sid,
           auth_token: twilioFormData.auth_token,
           phone_number: twilioFormData.phone_number,
+          webhook_url: webhookUrls.voice,
           sms_enabled: twilioFormData.sms_enabled,
           voice_enabled: twilioFormData.voice_enabled,
           voice_settings: {
             voice: twilioFormData.voice,
             language: twilioFormData.language,
             welcome_message: twilioFormData.welcome_message,
-            follow_up_message: twilioFormData.follow_up_message
+            follow_up_message: twilioFormData.follow_up_message,
+            railway_url: 'https://nodejs-production-3c84.up.railway.app'
           }
         })
         .select()
