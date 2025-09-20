@@ -97,9 +97,8 @@ fastify.register(async (fastify) => {
       const voice = VOICE;
       const instructions = SYSTEM_MESSAGE;
 
-      // CORRECT session format - ADDING REQUIRED TYPE FIELD
+      // CORRECT session format - NO TYPE FIELD IN SESSION OBJECT
       const sessionData = {
-        type: "ephemeral",
         modalities: ["text", "audio"],
         instructions: instructions,
         voice: voice,
@@ -123,7 +122,7 @@ fastify.register(async (fastify) => {
         session: sessionData
       };
 
-      console.log('✅ CORRECT SESSION FORMAT (NO TYPE IN SESSION):', JSON.stringify(sessionUpdate));
+      console.log('✅ CORRECT SESSION FORMAT:', JSON.stringify(sessionUpdate));
       console.log('🚀 SENDING CORRECTED SESSION UPDATE');
       openAiWs.send(JSON.stringify(sessionUpdate));
 
