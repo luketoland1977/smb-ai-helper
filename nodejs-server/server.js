@@ -98,7 +98,7 @@ fastify.register(async (fastify) => {
         type: 'session.update',
         session: {
           modalities: ['text', 'audio'],
-          instructions: 'You are a helpful AI assistant. Speak naturally and conversationally.',
+          instructions: 'pmpt_68c50f2852548197b42ccce02443ea1804c7524836544f5a',
           voice: 'alloy',
           input_audio_format: 'g711_ulaw',
           output_audio_format: 'g711_ulaw',
