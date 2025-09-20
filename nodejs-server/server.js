@@ -90,12 +90,36 @@ fastify.register(async (fastify) => {
       }
     });
 
-    // ULTIMATE FIX - REMOVING INVALID TYPE FIELD FROM SESSION OBJECT
+    // FIXED AUDIO FORMAT CONFIGURATION FOR TWILIO COMPATIBILITY
     const initializeSession = () => {
-      console.log('🎯 SESSION INIT v4.0 - USING DEFAULT SESSION');
-      console.log('Skipping session update - using OpenAI defaults');
+      console.log('🎯 SESSION INIT v5.0 - CONFIGURING AUDIO FORMATS FOR TWILIO');
       
-      // Don't send session update at all, just trigger initial greeting
+      const sessionUpdate = {
+        type: 'session.update',
+        session: {
+          modalities: ['text', 'audio'],
+          instructions: 'You are a helpful AI assistant. Speak naturally and conversationally.',
+          voice: 'alloy',
+          input_audio_format: 'g711_ulaw',
+          output_audio_format: 'g711_ulaw',
+          input_audio_transcription: {
+            model: 'whisper-1'
+          },
+          turn_detection: {
+            type: 'server_vad',
+            threshold: 0.5,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 1000
+          },
+          temperature: 0.8,
+          max_response_output_tokens: 'inf'
+        }
+      };
+
+      console.log('📤 Sending session configuration with g711_ulaw format');
+      openAiWs.send(JSON.stringify(sessionUpdate));
+      
+      // Send initial greeting after session is configured
       setTimeout(() => {
         sendInitialConversationItem();
       }, 1000);
