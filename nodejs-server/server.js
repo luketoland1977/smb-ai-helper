@@ -202,7 +202,6 @@ fastify.all('/incoming-call', async (request, reply) => {
   
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                         <Response>
-                            <Say voice="Google.en-US-Chirp3-HD-Aoede">One moment while we connect you to your AI assistant</Say>
                             <Connect>
                                 <Stream url="${streamUrl}" />
                             </Connect>
