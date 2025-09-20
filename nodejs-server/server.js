@@ -183,18 +183,7 @@ fastify.register(async function (fastify) {
   });
 });
 
-// WebSocket test endpoint
-fastify.register(async function (fastify) {
-  fastify.get('/ws-test', { websocket: true }, (connection, req) => {
-    console.log('🧪 Test WebSocket connected');
-    connection.send('Hello from WebSocket!');
-    
-    connection.on('message', (message) => {
-      console.log('🧪 Test WebSocket received:', message.toString());
-      connection.send(`Echo: ${message}`);
-    });
-  });
-});
+// Duplicate route removed - keeping only the first /ws-test registration
 
 
 // Route for Twilio to handle incoming calls - Enhanced with client identification
