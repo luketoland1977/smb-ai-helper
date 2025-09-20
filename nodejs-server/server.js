@@ -44,7 +44,7 @@ const SHOW_TIMING_MATH = false;
 
 // Root Route
 fastify.get('/', async (request, reply) => {
-  reply.send({ message: 'Twilio Media Stream Server is running!' });
+  reply.send({ message: 'Twilio Media Stream Server v4.0 - Session Fixed!', timestamp: new Date().toISOString() });
 });
 
 // Health check endpoint
