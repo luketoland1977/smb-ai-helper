@@ -98,6 +98,8 @@ function getDefaultConfiguration() {
     systemPrompt: SYSTEM_MESSAGE,
     voice: VOICE,
     openaiApiKey: null,
+    twilioAccountSid: null,
+    twilioAuthToken: null,
     knowledgeBase: []
   };
 }

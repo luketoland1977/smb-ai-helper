@@ -354,6 +354,7 @@ const ChatWidgetManager = () => {
           client_id: twilioFormData.client_id,
           agent_id: twilioFormData.agent_id,
           account_sid: twilioFormData.account_sid,
+          auth_token: twilioFormData.auth_token,
           phone_number: twilioFormData.phone_number,
           sms_enabled: twilioFormData.sms_enabled,
           voice_enabled: twilioFormData.voice_enabled,

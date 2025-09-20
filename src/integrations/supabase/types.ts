@@ -702,6 +702,7 @@ export type Database = {
         Row: {
           account_sid: string
           agent_id: string | null
+          auth_token: string | null
           client_id: string
           created_at: string
           id: string
@@ -716,6 +717,7 @@ export type Database = {
         Insert: {
           account_sid: string
           agent_id?: string | null
+          auth_token?: string | null
           client_id: string
           created_at?: string
           id?: string
@@ -730,6 +732,7 @@ export type Database = {
         Update: {
           account_sid?: string
           agent_id?: string | null
+          auth_token?: string | null
           client_id?: string
           created_at?: string
           id?: string
