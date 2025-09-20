@@ -171,6 +171,7 @@ fastify.all('/incoming-call', async (request, reply) => {
   
   // Create WebSocket URL with client context parameters
   const streamUrl = `wss://${request.headers.host}/media-stream?to=${encodeURIComponent(twilioNumber)}&from=${encodeURIComponent(callerNumber)}`;
+  console.log(`🔗 Generated WebSocket URL: ${streamUrl}`);
   
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                         <Response>
@@ -180,15 +181,22 @@ fastify.all('/incoming-call', async (request, reply) => {
                             </Connect>
                         </Response>`;
 
+  console.log('📤 Sending TwiML Response:');
+  console.log(twimlResponse);
+  
   reply.type('text/xml').send(twimlResponse);
+  console.log('✅ TwiML Response sent successfully');
 });
 
 // WebSocket route for media-stream - Enhanced with client-specific configuration
 fastify.register(async (fastify) => {
+  console.log('🔌 Registering WebSocket route: /media-stream');
+  
   fastify.get('/media-stream', { websocket: true }, async (connection, req) => {
     console.log('=== MEDIA STREAM WEBSOCKET CONNECTED ===');
     console.log('Request headers:', req.headers);
     console.log('Query parameters:', req.query);
+    console.log('WebSocket connection established successfully!');
     
     // Extract client context from query parameters
     const { to: twilioNumber, from: callerNumber } = req.query;
