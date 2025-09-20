@@ -14,41 +14,94 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_configurations: {
+        Row: {
+          agent_id: string
+          auto_response_enabled: boolean | null
+          chat_settings: Json | null
+          created_at: string | null
+          id: string
+          knowledge_base_enabled: boolean | null
+          phone_settings: Json | null
+          updated_at: string | null
+          voice_settings: Json | null
+        }
+        Insert: {
+          agent_id: string
+          auto_response_enabled?: boolean | null
+          chat_settings?: Json | null
+          created_at?: string | null
+          id?: string
+          knowledge_base_enabled?: boolean | null
+          phone_settings?: Json | null
+          updated_at?: string | null
+          voice_settings?: Json | null
+        }
+        Update: {
+          agent_id?: string
+          auto_response_enabled?: boolean | null
+          chat_settings?: Json | null
+          created_at?: string | null
+          id?: string
+          knowledge_base_enabled?: boolean | null
+          phone_settings?: Json | null
+          updated_at?: string | null
+          voice_settings?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_configurations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agents: {
         Row: {
+          auto_created: boolean | null
           client_id: string | null
           created_at: string | null
           description: string | null
           id: string
+          is_default: boolean | null
           name: string
           openai_api_key: string | null
           settings: Json | null
           status: Database["public"]["Enums"]["agent_status"] | null
           system_prompt: string | null
+          template_type: string | null
           updated_at: string | null
         }
         Insert: {
+          auto_created?: boolean | null
           client_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          is_default?: boolean | null
           name: string
           openai_api_key?: string | null
           settings?: Json | null
           status?: Database["public"]["Enums"]["agent_status"] | null
           system_prompt?: string | null
+          template_type?: string | null
           updated_at?: string | null
         }
         Update: {
+          auto_created?: boolean | null
           client_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          is_default?: boolean | null
           name?: string
           openai_api_key?: string | null
           settings?: Json | null
           status?: Database["public"]["Enums"]["agent_status"] | null
           system_prompt?: string | null
+          template_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
