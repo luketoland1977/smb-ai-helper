@@ -83,12 +83,21 @@ fastify.register(async (fastify) => {
     let markQueue = [];
     let responseStartTimestampTwilio = null;
 
+    console.log('🚀 Creating OpenAI WebSocket connection...');
     const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`, {
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
         'OpenAI-Beta': 'realtime=v1'
       }
     });
+
+    // Add connection timeout
+    const connectionTimeout = setTimeout(() => {
+      if (openAiWs.readyState !== WebSocket.OPEN) {
+        console.error('❌ OpenAI WebSocket connection timeout');
+        openAiWs.close();
+      }
+    }, 10000); // 10 second timeout
 
     // FIXED AUDIO FORMAT CONFIGURATION FOR TWILIO COMPATIBILITY
     const initializeSession = () => {
@@ -192,7 +201,9 @@ fastify.register(async (fastify) => {
 
     // Open event for OpenAI WebSocket
     openAiWs.on('open', () => {
-      console.log('Connected to the OpenAI Realtime API');
+      clearTimeout(connectionTimeout);
+      console.log('✅ Connected to the OpenAI Realtime API');
+      console.log('🔗 WebSocket readyState:', openAiWs.readyState);
       console.time('session_initialization');
       initializeSession();
     });
@@ -282,7 +293,8 @@ fastify.register(async (fastify) => {
               openAiWs.send(JSON.stringify(audioAppend));
               console.log(`📤 Sent audio to OpenAI, payload length: ${data.media.payload.length}`);
             } else {
-              console.log('⚠️ OpenAI WebSocket not ready, dropping audio');
+              console.log(`⚠️ OpenAI WebSocket not ready (state: ${openAiWs.readyState}), dropping audio`);
+              console.log('🔍 WebSocket states: CONNECTING=0, OPEN=1, CLOSING=2, CLOSED=3');
             }
             break;
           case 'start':
@@ -314,12 +326,20 @@ fastify.register(async (fastify) => {
     });
 
     // Handle WebSocket close and errors
-    openAiWs.on('close', () => {
-      console.log('Disconnected from the OpenAI Realtime API');
+    openAiWs.on('close', (code, reason) => {
+      clearTimeout(connectionTimeout);
+      console.log('❌ Disconnected from the OpenAI Realtime API');
+      console.log('🔍 Close code:', code, 'Reason:', reason.toString());
     });
 
     openAiWs.on('error', (error) => {
-      console.error('Error in the OpenAI WebSocket:', error);
+      clearTimeout(connectionTimeout);
+      console.error('💥 Error in the OpenAI WebSocket:', error.message);
+      console.error('🔍 Error details:', {
+        type: error.type,
+        code: error.code,
+        target: error.target?.url || 'unknown'
+      });
     });
   });
 });
