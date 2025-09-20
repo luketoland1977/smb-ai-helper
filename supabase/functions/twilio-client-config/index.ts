@@ -56,6 +56,7 @@ serve(async (req) => {
         agent_id,
         account_sid,
         auth_token,
+        voice_settings,
         clients!inner(name),
         ai_agents!inner(name, system_prompt, openai_api_key, settings)
       `)
@@ -74,14 +75,18 @@ serve(async (req) => {
       });
     }
 
-    // Step 2: Build client configuration
+    // Step 2: Build client configuration with fallback for voice settings
+    const voice = integration.ai_agents.settings?.voice || 
+                  integration.voice_settings?.voice || 
+                  'alloy';
+    
     const clientConfig = {
       clientId: integration.client_id,
       clientName: integration.clients.name,
       agentId: integration.agent_id,
       agentName: integration.ai_agents.name,
       systemPrompt: integration.ai_agents.system_prompt || 'You are a helpful AI assistant.',
-      voice: integration.ai_agents.settings?.voice || 'alloy',
+      voice: voice,
       openaiApiKey: integration.ai_agents.openai_api_key || null,
       twilioAccountSid: integration.account_sid || null,
       twilioAuthToken: integration.auth_token || null,

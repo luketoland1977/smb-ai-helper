@@ -76,7 +76,7 @@ const AgentForm = () => {
       setFormData({
         name: data.name,
         description: data.description || '',
-        client_id: data.client_id,
+        client_id: data.client_id || '', // Handle null client_id properly
         system_prompt: data.system_prompt || '',
         status: data.status,
         openai_api_key: data.openai_api_key || ''
@@ -86,13 +86,42 @@ const AgentForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.client_id) {
+      toast({
+        title: "Error",
+        description: "Please select a client",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter an agent name",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Prepare data, ensuring no empty strings for UUID fields
+      const submitData = {
+        ...formData,
+        client_id: formData.client_id || null,
+        description: formData.description || null,
+        system_prompt: formData.system_prompt || null,
+        openai_api_key: formData.openai_api_key || null
+      };
+
       if (isEditing) {
         const { error } = await supabase
           .from('ai_agents')
-          .update(formData)
+          .update(submitData)
           .eq('id', id);
 
         if (error) throw error;
@@ -104,7 +133,7 @@ const AgentForm = () => {
       } else {
         const { error } = await supabase
           .from('ai_agents')
-          .insert([formData]);
+          .insert([submitData]);
 
         if (error) throw error;
 
