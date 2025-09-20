@@ -8,16 +8,24 @@ import fastifyWs from '@fastify/websocket';
 dotenv.config();
 
 // Retrieve the OpenAI API key from environment variables.
-const { OPENAI_API_KEY } = process.env;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const PORT = process.env.PORT || 3001;
 
-if (!OPENAI_API_KEY) {
-  console.error('Missing OpenAI API key. Please set it in the .env file.');
-  process.exit(1);
+console.log('🔑 Environment check:');
+console.log(`  - PORT: ${PORT}`);
+console.log(`  - OPENAI_API_KEY: ${OPENAI_API_KEY ? '✅ Set' : '❌ Missing'}`);
+console.log(`  - SUPABASE_URL: ${process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing'}`);
+
+// Note: OpenAI API key will be loaded per-client from database
+if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+  console.log('⚠️ System OpenAI API key not set - will use client-specific keys only');
 }
 
-// Initialize Fastify
-const fastify = Fastify();
+// Initialize Fastify with proper logger configuration
+const fastify = Fastify({ 
+  logger: true,
+  trustProxy: true // Important for Railway deployments
+});
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
@@ -189,7 +197,7 @@ fastify.all('/incoming-call', async (request, reply) => {
 });
 
 // WebSocket route for media-stream - Enhanced with client-specific configuration
-fastify.register(async (fastify) => {
+fastify.register(async function (fastify) {
   console.log('🔌 Registering WebSocket route: /media-stream');
   
   fastify.get('/media-stream', { websocket: true }, async (connection, req) => {
@@ -534,6 +542,7 @@ fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
     process.exit(1);
   }
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 Server accessible at: http://0.0.0.0:${PORT}`);
   console.log(`📊 Process info:`, {
     pid: process.pid,
     nodeVersion: process.version,
