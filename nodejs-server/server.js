@@ -107,11 +107,11 @@ fastify.register(async (fastify) => {
           },
           turn_detection: {
             type: 'server_vad',
-            threshold: 0.55,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 500
+            threshold: 0.5,
+            prefix_padding_ms: 200,
+            silence_duration_ms: 400
           },
-          temperature: 0.8,
+          temperature: 0.7,
           max_response_output_tokens: 'inf'
         }
       };
@@ -126,7 +126,7 @@ fastify.register(async (fastify) => {
     // Send initial conversation item so AI speaks first
     const sendInitialConversationItem = () => {
       console.time('initial_greeting_sent');
-      const greeting = 'Hello how may I assist you?';
+      const greeting = 'Hi!';
       
       const initialConversationItem = {
         type: 'conversation.item.create',
@@ -136,7 +136,7 @@ fastify.register(async (fastify) => {
           content: [
             {
               type: 'input_text',
-              text: `Greet the user with "${greeting}"`
+              text: `Say "${greeting}"`
             }
           ]
         }
