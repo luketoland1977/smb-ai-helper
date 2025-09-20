@@ -92,41 +92,13 @@ fastify.register(async (fastify) => {
 
     // ULTIMATE FIX - REMOVING INVALID TYPE FIELD FROM SESSION OBJECT
     const initializeSession = () => {
-      console.log('🎯 ULTIMATE SESSION FIX v3.0 - REMOVING TYPE FIELD');
-      const voice = VOICE;
-      const instructions = SYSTEM_MESSAGE;
-
-      // CORRECT session format - NO TYPE FIELD IN SESSION OBJECT
-      const sessionData = {
-        modalities: ["text", "audio"],
-        instructions: instructions,
-        voice: voice,
-        input_audio_format: "g711_ulaw",
-        output_audio_format: "g711_ulaw",
-        input_audio_transcription: {
-          model: "whisper-1"
-        },
-        turn_detection: {
-          type: "server_vad",
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 1000
-        },
-        temperature: TEMPERATURE,
-        max_response_output_tokens: "inf"
-      };
-
-      const sessionUpdate = {
-        type: 'session.update',
-        session: sessionData
-      };
-
-      console.log('✅ CORRECT SESSION FORMAT:', JSON.stringify(sessionUpdate));
-      console.log('🚀 SENDING CORRECTED SESSION UPDATE');
-      openAiWs.send(JSON.stringify(sessionUpdate));
+      console.log('🎯 SESSION INIT v4.0 - USING DEFAULT SESSION');
+      console.log('Skipping session update - using OpenAI defaults');
       
-      // Have AI speak first with greeting
-      sendInitialConversationItem();
+      // Don't send session update at all, just trigger initial greeting
+      setTimeout(() => {
+        sendInitialConversationItem();
+      }, 1000);
     };
 
     // Send initial conversation item so AI speaks first
