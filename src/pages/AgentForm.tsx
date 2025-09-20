@@ -26,7 +26,8 @@ const AgentForm = () => {
     description: '',
     client_id: '',
     system_prompt: '',
-    status: 'active' as 'active' | 'inactive' | 'training'
+    status: 'active' as 'active' | 'inactive' | 'training',
+    openai_api_key: ''
   });
 
   const isEditing = Boolean(id);
@@ -77,7 +78,8 @@ const AgentForm = () => {
         description: data.description || '',
         client_id: data.client_id,
         system_prompt: data.system_prompt || '',
-        status: data.status
+        status: data.status,
+        openai_api_key: data.openai_api_key || ''
       });
     }
   };
@@ -231,6 +233,20 @@ Guidelines:
                     <SelectItem value="training">Training</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="openai_api_key">OpenAI API Key</Label>
+                <Input
+                  id="openai_api_key"
+                  type="password"
+                  value={formData.openai_api_key}
+                  onChange={(e) => setFormData({ ...formData, openai_api_key: e.target.value })}
+                  placeholder="sk-..."
+                />
+                <p className="text-sm text-muted-foreground">
+                  Optional: Use your own OpenAI API key for this agent. If not provided, the system default will be used.
+                </p>
               </div>
 
               <div className="space-y-2">
