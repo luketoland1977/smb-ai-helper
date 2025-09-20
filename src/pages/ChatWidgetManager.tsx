@@ -99,6 +99,7 @@ const ChatWidgetManager = () => {
     client_id: '',
     agent_id: '',
     account_sid: '',
+    auth_token: '',
     phone_number: '',
     sms_enabled: true,
     voice_enabled: true,
@@ -337,7 +338,7 @@ const ChatWidgetManager = () => {
   };
 
   const createTwilioIntegration = async () => {
-    if (!twilioFormData.client_id || !twilioFormData.agent_id || !twilioFormData.phone_number || !twilioFormData.account_sid) {
+    if (!twilioFormData.client_id || !twilioFormData.agent_id || !twilioFormData.phone_number || !twilioFormData.account_sid || !twilioFormData.auth_token) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -380,6 +381,7 @@ const ChatWidgetManager = () => {
         client_id: '',
         agent_id: '',
         account_sid: '',
+        auth_token: '',
         phone_number: '',
         sms_enabled: true,
         voice_enabled: true,
@@ -884,9 +886,25 @@ const ChatWidgetManager = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>Create Phone Integration</CardTitle>
-                  <CardDescription>Connect Twilio for SMS and voice calls</CardDescription>
+                  <CardDescription>
+                    Connect Twilio for SMS and voice calls. This integration will use the OpenAI API key configured in your selected AI agent.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                      <h4 className="font-medium text-amber-900">Required Credentials</h4>
+                    </div>
+                    <p className="text-sm text-amber-800 mb-2">
+                      For phone integration to work, you need:
+                    </p>
+                    <ul className="text-sm text-amber-800 list-disc list-inside space-y-1">
+                      <li><strong>OpenAI API Key:</strong> Configure this in your AI Agent settings</li>
+                      <li><strong>Twilio Credentials:</strong> Account SID and Auth Token from your Twilio console</li>
+                      <li><strong>Phone Number:</strong> A Twilio phone number you've purchased</li>
+                    </ul>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="twilio-client">Client</Label>
@@ -918,7 +936,7 @@ const ChatWidgetManager = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="account-sid">Twilio Account SID</Label>
                       <Input
@@ -926,6 +944,16 @@ const ChatWidgetManager = () => {
                         placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                         value={twilioFormData.account_sid}
                         onChange={(e) => setTwilioFormData({...twilioFormData, account_sid: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="auth-token">Twilio Auth Token</Label>
+                      <Input
+                        id="auth-token"
+                        type="password"
+                        placeholder="Enter your Twilio Auth Token"
+                        value={twilioFormData.auth_token}
+                        onChange={(e) => setTwilioFormData({...twilioFormData, auth_token: e.target.value})}
                       />
                     </div>
                     <div>
