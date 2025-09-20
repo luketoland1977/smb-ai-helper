@@ -75,10 +75,20 @@ serve(async (req) => {
       });
     }
 
-    // Step 2: Build client configuration with fallback for voice settings
+    // Step 2: Build client configuration with enhanced validation
     const voice = integration.ai_agents.settings?.voice || 
                   integration.voice_settings?.voice || 
                   'alloy';
+    
+    // Validate and sanitize API key
+    let openaiApiKey = integration.ai_agents.openai_api_key;
+    if (openaiApiKey) {
+      // Basic validation - ensure it starts with 'sk-' and has reasonable length
+      if (!openaiApiKey.startsWith('sk-') || openaiApiKey.length < 20) {
+        console.log(`⚠️ Invalid OpenAI API key format for agent ${integration.ai_agents.name}`);
+        openaiApiKey = null;
+      }
+    }
     
     const clientConfig = {
       clientId: integration.client_id,
@@ -87,10 +97,11 @@ serve(async (req) => {
       agentName: integration.ai_agents.name,
       systemPrompt: integration.ai_agents.system_prompt || 'You are a helpful AI assistant.',
       voice: voice,
-      openaiApiKey: integration.ai_agents.openai_api_key || null,
+      openaiApiKey: openaiApiKey,
       twilioAccountSid: integration.account_sid || null,
       twilioAuthToken: integration.auth_token || null,
-      knowledgeBase: []
+      knowledgeBase: [],
+      lastUpdated: new Date().toISOString()
     };
 
     // Step 3: Search knowledge base for relevant content (optional initial context)

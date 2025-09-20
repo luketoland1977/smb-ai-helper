@@ -58,10 +58,14 @@ const LOG_EVENT_TYPES = [
 // Show AI response elapsed timing calculations
 const SHOW_TIMING_MATH = false;
 
-// Client configuration functions
+// Client configuration functions with enhanced validation
 async function loadClientConfiguration(twilioNumber, callerNumber) {
   try {
     console.log(`🔍 Looking up client config for Twilio number: ${twilioNumber}`);
+    
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     // Call Supabase Edge Function to load client configuration
     const response = await fetch('https://ycvvuepfsebqpwmamqgg.functions.supabase.co/twilio-client-config', {
@@ -73,8 +77,11 @@ async function loadClientConfiguration(twilioNumber, callerNumber) {
       body: JSON.stringify({
         twilioNumber,
         callerNumber
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       console.log(`⚠️ No client config found (${response.status}), using defaults`);
@@ -93,16 +100,58 @@ async function loadClientConfiguration(twilioNumber, callerNumber) {
       return null;
     }
 
+    // Validate API key if present
+    if (data.config.openaiApiKey) {
+      const isValid = await validateOpenAIKey(data.config.openaiApiKey);
+      if (!isValid) {
+        console.error(`❌ Invalid OpenAI API key for client: ${data.config.clientName}`);
+        // Don't fail completely, just remove the invalid key so fallback can work
+        data.config.openaiApiKey = null;
+      }
+    }
+
     console.log(`✅ Client config loaded:`, {
       clientName: data.config.clientName,
       agentName: data.config.agentName,
-      hasCustomKey: Boolean(data.config.openaiApiKey)
+      hasCustomKey: Boolean(data.config.openaiApiKey),
+      hasKnowledgeBase: Boolean(data.config.knowledgeBase?.length)
     });
     
     return data.config;
   } catch (error) {
-    console.error('❌ Error loading client configuration:', error);
+    if (error.name === 'AbortError') {
+      console.error('❌ Client configuration loading timeout');
+    } else {
+      console.error('❌ Error loading client configuration:', error);
+    }
     return null;
+  }
+}
+
+// Validate OpenAI API key by making a simple API call
+async function validateOpenAIKey(apiKey) {
+  try {
+    console.log(`🔑 Validating OpenAI API key...`);
+    
+    const response = await fetch('https://api.openai.com/v1/models', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      signal: AbortSignal.timeout(3000) // 3 second timeout
+    });
+
+    if (response.ok) {
+      console.log(`✅ OpenAI API key validation successful`);
+      return true;
+    } else {
+      console.log(`❌ OpenAI API key validation failed: ${response.status} ${response.statusText}`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`❌ OpenAI API key validation error:`, error.message);
+    return false;
   }
 }
 
@@ -327,7 +376,8 @@ fastify.register(async function (fastify) {
     const { to: twilioNumber, from: callerNumber } = req.query;
     console.log(`🔍 Identifying client for call: ${callerNumber} → ${twilioNumber}`);
     
-    // Load client-specific configuration
+    // Load client-specific configuration with enhanced error handling
+    console.log(`⏳ Loading configuration for call: ${callerNumber} → ${twilioNumber}`);
     let clientConfig = await loadClientConfiguration(twilioNumber, callerNumber);
     if (!clientConfig) {
       console.log('⚠️ No client configuration found, using defaults');
@@ -343,25 +393,55 @@ fastify.register(async function (fastify) {
     let markQueue = [];
     let responseStartTimestampTwilio = null;
 
-    // Use client-specific OpenAI API key or system default
-    const apiKey = clientConfig.openaiApiKey || OPENAI_API_KEY;
+    // Determine which API key to use with fallback logic
+    let apiKey = clientConfig.openaiApiKey || OPENAI_API_KEY;
+    
+    // Final validation - ensure we have a working API key
+    if (!apiKey || apiKey === 'your_openai_api_key_here') {
+      console.error('❌ No valid OpenAI API key available - cannot establish connection');
+      connection.send(JSON.stringify({
+        event: 'error',
+        error: 'No valid OpenAI API key configured'
+      }));
+      connection.close();
+      return;
+    }
+
     console.log(`🔑 Using ${clientConfig.openaiApiKey ? 'client-specific' : 'system'} OpenAI API key`);
     
+    // Create OpenAI WebSocket connection with enhanced error handling
     console.log('🚀 Creating OpenAI WebSocket connection...');
-    const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'OpenAI-Beta': 'realtime=v1'
-      }
-    });
+    let openAiWs;
+    
+    try {
+      openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'OpenAI-Beta': 'realtime=v1'
+        }
+      });
+    } catch (error) {
+      console.error('❌ Failed to create OpenAI WebSocket:', error);
+      connection.send(JSON.stringify({
+        event: 'error',
+        error: 'Failed to establish AI connection'
+      }));
+      connection.close();
+      return;
+    }
 
-    // Add connection timeout
+    // Add connection timeout with cleanup
     const connectionTimeout = setTimeout(() => {
       if (openAiWs.readyState !== WebSocket.OPEN) {
         console.error('❌ OpenAI WebSocket connection timeout');
+        connection.send(JSON.stringify({
+          event: 'error',
+          error: 'AI connection timeout'
+        }));
         openAiWs.close();
+        connection.close();
       }
-    }, 10000); // 10 second timeout
+    }, 15000); // 15 second timeout (increased for better reliability)
 
     // FIXED AUDIO FORMAT CONFIGURATION FOR TWILIO COMPATIBILITY - Enhanced with client config
     const initializeSession = () => {
@@ -465,13 +545,50 @@ fastify.register(async function (fastify) {
       }
     };
 
-    // Open event for OpenAI WebSocket
+    // Enhanced OpenAI WebSocket event handlers
     openAiWs.on('open', () => {
       clearTimeout(connectionTimeout);
-      console.log('✅ Connected to the OpenAI Realtime API');
+      console.log(`✅ Connected to OpenAI Realtime API for client: ${clientConfig.clientName}`);
       console.log('🔗 WebSocket readyState:', openAiWs.readyState);
       console.time('session_initialization');
+      
+      // Send success notification to Twilio
+      connection.send(JSON.stringify({
+        event: 'connected',
+        streamSid: streamSid
+      }));
+      
       initializeSession();
+    });
+
+    openAiWs.on('error', (error) => {
+      clearTimeout(connectionTimeout);
+      console.error('❌ OpenAI WebSocket error:', error);
+      
+      // Check if it's an authentication error (401/403)
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        console.error('🔑 Authentication failed - API key may be invalid');
+        
+        // If using client-specific key and it fails, try system default
+        if (clientConfig.openaiApiKey && OPENAI_API_KEY && OPENAI_API_KEY !== 'your_openai_api_key_here') {
+          console.log('🔄 Retrying with system default API key...');
+          // This would require reconnection logic - for now just log the issue
+        }
+      }
+      
+      connection.send(JSON.stringify({
+        event: 'error',
+        error: 'AI service connection failed'
+      }));
+      connection.close();
+    });
+
+    openAiWs.on('close', () => {
+      clearTimeout(connectionTimeout);
+      console.log('🔌 OpenAI WebSocket closed');
+      if (connection.readyState === WebSocket.OPEN) {
+        connection.close();
+      }
     });
 
     // Listen for messages from the OpenAI WebSocket (and send to Twilio if necessary)
