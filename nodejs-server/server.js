@@ -206,6 +206,7 @@ fastify.all('/incoming-call', async (request, reply) => {
                             <Connect>
                                 <Stream url="${streamUrl}" />
                             </Connect>
+                            <Pause length="60" />
                         </Response>`;
 
   console.log('📤 Sending TwiML Response:');
