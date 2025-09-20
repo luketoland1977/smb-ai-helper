@@ -196,9 +196,25 @@ fastify.all('/incoming-call', async (request, reply) => {
   const { To: twilioNumber, From: callerNumber } = request.body;
   console.log(`📞 Incoming call from ${callerNumber} to ${twilioNumber}`);
   
-  // Create WebSocket URL with client context parameters
-  const streamUrl = `wss://${request.headers.host}/media-stream?to=${encodeURIComponent(twilioNumber)}&from=${encodeURIComponent(callerNumber)}`;
+  // Create WebSocket URL with client context parameters - Force WSS for Twilio
+  const host = request.headers.host;
+  const streamUrl = `wss://${host}/media-stream?to=${encodeURIComponent(twilioNumber)}&from=${encodeURIComponent(callerNumber)}`;
   console.log(`🔗 Generated WebSocket URL: ${streamUrl}`);
+  
+  // Test the WebSocket URL by making a connection attempt
+  console.log('🧪 Testing WebSocket connectivity...');
+  try {
+    const testWs = new WebSocket(`wss://${host}/ws-test`);
+    testWs.on('open', () => {
+      console.log('✅ Test WebSocket connection successful');
+      testWs.close();
+    });
+    testWs.on('error', (error) => {
+      console.error('❌ Test WebSocket connection failed:', error);
+    });
+  } catch (error) {
+    console.error('❌ WebSocket test error:', error);
+  }
   
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                         <Response>
@@ -218,13 +234,34 @@ fastify.all('/incoming-call', async (request, reply) => {
 // Add WebSocket logging before route registration
 console.log('🔌 Registering WebSocket route: /media-stream');
 
-// WebSocket route for media-stream - Enhanced with client-specific configuration
+// WebSocket route for media-stream - Enhanced with client-specific configuration and debugging
 fastify.register(async function (fastify) {
-  fastify.get('/media-stream', { websocket: true }, async (connection, req) => {
+  // Add debug middleware for WebSocket upgrade requests
+  fastify.addHook('onRequest', async (request, reply) => {
+    if (request.url.includes('/media-stream')) {
+      console.log('🔍 === WEBSOCKET REQUEST RECEIVED ===');
+      console.log('📍 URL:', request.url);
+      console.log('🔗 Headers:', request.headers);
+      console.log('📊 Query:', request.query);
+      console.log('🌐 Method:', request.method);
+      console.log('🔧 Upgrade header:', request.headers.upgrade);
+      console.log('🤝 Connection header:', request.headers.connection);
+    }
+  });
+
+  fastify.get('/media-stream', { 
+    websocket: true,
+    preHandler: async (request, reply) => {
+      console.log('🎯 === PRE-HANDLER FOR MEDIA STREAM ===');
+      console.log('📱 User-Agent:', request.headers['user-agent']);
+      console.log('🔐 Authorization:', request.headers['authorization'] ? 'Present' : 'Missing');
+    }
+  }, async (connection, req) => {
     console.log('🎯 === MEDIA STREAM WEBSOCKET CONNECTED ===');
     console.log('🔗 Request headers:', req.headers);
     console.log('📊 Query parameters:', req.query);
     console.log('✅ WebSocket connection established successfully!');
+    console.log('📞 Twilio attempting connection from:', req.headers['user-agent']);
     
     // Add connection error handling
     connection.on('error', (error) => {
