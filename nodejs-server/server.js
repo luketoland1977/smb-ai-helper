@@ -221,10 +221,19 @@ console.log('🔌 Registering WebSocket route: /media-stream');
 // WebSocket route for media-stream - Enhanced with client-specific configuration
 fastify.register(async function (fastify) {
   fastify.get('/media-stream', { websocket: true }, async (connection, req) => {
-    console.log('=== MEDIA STREAM WEBSOCKET CONNECTED ===');
-    console.log('Request headers:', req.headers);
-    console.log('Query parameters:', req.query);
-    console.log('WebSocket connection established successfully!');
+    console.log('🎯 === MEDIA STREAM WEBSOCKET CONNECTED ===');
+    console.log('🔗 Request headers:', req.headers);
+    console.log('📊 Query parameters:', req.query);
+    console.log('✅ WebSocket connection established successfully!');
+    
+    // Add connection error handling
+    connection.on('error', (error) => {
+      console.error('❌ WebSocket connection error:', error);
+    });
+    
+    connection.on('close', (code, reason) => {
+      console.log(`🔌 WebSocket closed - Code: ${code}, Reason: ${reason}`);
+    });
     
     // Extract client context from query parameters
     const { to: twilioNumber, from: callerNumber } = req.query;
