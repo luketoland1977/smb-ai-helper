@@ -125,14 +125,14 @@ fastify.register(async (fastify) => {
       console.log('✅ CORRECT SESSION FORMAT:', JSON.stringify(sessionUpdate));
       console.log('🚀 SENDING CORRECTED SESSION UPDATE');
       openAiWs.send(JSON.stringify(sessionUpdate));
-
-      // Uncomment to have AI speak first:
-      // sendInitialConversationItem();
+      
+      // Have AI speak first with greeting
+      sendInitialConversationItem();
     };
 
-    // Send initial conversation item if AI talks first
+    // Send initial conversation item so AI speaks first
     const sendInitialConversationItem = () => {
-      const greeting = 'Hello there! I am an AI voice assistant powered by Twilio and the OpenAI Realtime API. You can ask me for facts, jokes, or anything you can imagine. How can I help you?';
+      const greeting = 'Hello! How may I assist you today?';
       
       const initialConversationItem = {
         type: 'conversation.item.create',
