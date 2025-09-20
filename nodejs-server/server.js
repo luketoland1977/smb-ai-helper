@@ -119,15 +119,14 @@ fastify.register(async (fastify) => {
       console.log('📤 Sending session configuration with g711_ulaw format');
       openAiWs.send(JSON.stringify(sessionUpdate));
       
-      // Send initial greeting after session is configured
-      setTimeout(() => {
-        sendInitialConversationItem();
-      }, 1000);
+      // Send initial greeting immediately after session configuration
+      sendInitialConversationItem();
     };
 
     // Send initial conversation item so AI speaks first
     const sendInitialConversationItem = () => {
-      const greeting = 'Hello! How may I assist you today?';
+      console.time('initial_greeting_sent');
+      const greeting = 'Hello how may I assist you?';
       
       const initialConversationItem = {
         type: 'conversation.item.create',
@@ -146,6 +145,7 @@ fastify.register(async (fastify) => {
       if (SHOW_TIMING_MATH) console.log('Sending initial conversation item:', JSON.stringify(initialConversationItem));
       openAiWs.send(JSON.stringify(initialConversationItem));
       openAiWs.send(JSON.stringify({ type: 'response.create' }));
+      console.timeEnd('initial_greeting_sent');
     };
 
     // Handle interruption when the caller's speech starts
@@ -193,7 +193,8 @@ fastify.register(async (fastify) => {
     // Open event for OpenAI WebSocket
     openAiWs.on('open', () => {
       console.log('Connected to the OpenAI Realtime API');
-      setTimeout(initializeSession, 100);
+      console.time('session_initialization');
+      initializeSession();
     });
 
     // Listen for messages from the OpenAI WebSocket (and send to Twilio if necessary)
@@ -241,11 +242,18 @@ fastify.register(async (fastify) => {
           handleSpeechStartedEvent();
         }
 
+        if (response.type === 'session.created') {
+          console.timeEnd('session_initialization');
+          console.log('✅ Session created successfully');
+        }
+
         if (response.type === 'response.created') {
+          console.time('response_generation');
           console.log('🤖 OpenAI response started');
         }
 
         if (response.type === 'response.done') {
+          console.timeEnd('response_generation');
           console.log('✅ OpenAI response completed', {
             status: response.response?.status,
             output_count: response.response?.output?.length || 0
