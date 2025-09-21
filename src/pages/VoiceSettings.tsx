@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Phone, Bot, Mic, Settings, ArrowLeft } from "lucide-react";
@@ -11,6 +12,7 @@ import { BlandAdvancedSettings } from "@/components/BlandAdvancedSettings";
 import { BlandPathwayManager } from "@/components/BlandPathwayManager";
 import { BlandCampaignManager } from "@/components/BlandCampaignManager";
 import { BlandAnalyticsDashboard } from "@/components/BlandAnalyticsDashboard";
+import { BlandInboundNumberManager } from "@/components/BlandInboundNumberManager";
 import { useNavigate } from "react-router-dom";
 
 interface Client {
@@ -164,8 +166,9 @@ const VoiceSettings = () => {
 
                 <TabsContent value="bland-ai" className="space-y-6">
                   <Tabs defaultValue="integrations" className="space-y-4">
-                    <TabsList className="grid w-full grid-cols-5">
+                    <TabsList className="grid w-full grid-cols-6">
                       <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                      <TabsTrigger value="inbound">Inbound Numbers</TabsTrigger>
                       <TabsTrigger value="pathways">Pathways</TabsTrigger>
                       <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
                       <TabsTrigger value="settings">Advanced</TabsTrigger>
@@ -247,6 +250,29 @@ const VoiceSettings = () => {
                           }}
                         />
                       </div>
+                    </TabsContent>
+
+                    <TabsContent value="inbound" className="space-y-6">
+                      {clientAgents.length > 0 ? (
+                        <BlandInboundNumberManager
+                          clientId={selectedClientId}
+                          agents={clientAgents}
+                          integrationId={selectedIntegrationId}
+                        />
+                      ) : (
+                        <Card>
+                          <CardContent className="text-center py-8">
+                            <Phone className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                            <h3 className="text-lg font-semibold mb-2">No AI Agents</h3>
+                            <p className="text-muted-foreground mb-4">
+                              Create an AI agent for {selectedClient.name} first to purchase inbound numbers.
+                            </p>
+                            <Button onClick={() => navigate('/agents/new')}>
+                              Create AI Agent
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="pathways">

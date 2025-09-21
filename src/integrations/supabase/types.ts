@@ -324,6 +324,75 @@ export type Database = {
           },
         ]
       }
+      bland_inbound_numbers: {
+        Row: {
+          agent_id: string | null
+          area_code: string | null
+          bland_number_id: string | null
+          client_id: string
+          country_code: string
+          created_at: string
+          id: string
+          integration_id: string | null
+          is_active: boolean
+          monthly_cost: number | null
+          phone_number: string
+          purchased_at: string
+          settings: Json
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          area_code?: string | null
+          bland_number_id?: string | null
+          client_id: string
+          country_code?: string
+          created_at?: string
+          id?: string
+          integration_id?: string | null
+          is_active?: boolean
+          monthly_cost?: number | null
+          phone_number: string
+          purchased_at?: string
+          settings?: Json
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          area_code?: string | null
+          bland_number_id?: string | null
+          client_id?: string
+          country_code?: string
+          created_at?: string
+          id?: string
+          integration_id?: string | null
+          is_active?: boolean
+          monthly_cost?: number | null
+          phone_number?: string
+          purchased_at?: string
+          settings?: Json
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bland_inbound_numbers_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bland_inbound_numbers_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "bland_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bland_integrations: {
         Row: {
           agent_id: string | null

@@ -44,6 +44,16 @@ serve(async (req) => {
         return await createCustomTool(req);
       case 'get-analytics':
         return await getAnalytics(req);
+      case 'purchase-inbound-number':
+        return await purchaseInboundNumber(req);
+      case 'list-inbound-numbers':
+        return await listInboundNumbers(req);
+      case 'update-inbound-number':
+        return await updateInboundNumber(req);
+      case 'delete-inbound-number':
+        return await deleteInboundNumber(req);
+      case 'get-available-numbers':
+        return await getAvailableNumbers(req);
       default:
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,
@@ -473,6 +483,216 @@ async function getAnalytics(req: Request) {
     success: true, 
     analytics,
     campaigns: campaigns || []
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function purchaseInboundNumber(req: Request) {
+  const { client_id, integration_id, agent_id, country_code = 'US', area_code } = await req.json();
+
+  console.log('Purchasing inbound number via Bland AI:', { client_id, integration_id, country_code, area_code });
+
+  // Purchase number from Bland AI
+  const purchaseData = {
+    country_code,
+    ...(area_code && { area_code }),
+  };
+
+  const purchaseResponse = await fetch('https://api.bland.ai/v1/inbound/purchase', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${blandApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(purchaseData),
+  });
+
+  if (!purchaseResponse.ok) {
+    const errorText = await purchaseResponse.text();
+    console.error('Bland AI purchase number error:', errorText);
+    throw new Error(`Failed to purchase number: ${errorText}`);
+  }
+
+  const purchasedNumber = await purchaseResponse.json();
+  console.log('Bland AI number purchased:', purchasedNumber);
+
+  // Store the purchased number in database
+  const { data: inboundNumber, error: numberError } = await supabase
+    .from('bland_inbound_numbers')
+    .insert({
+      client_id,
+      integration_id,
+      agent_id,
+      phone_number: purchasedNumber.phone_number,
+      bland_number_id: purchasedNumber.number_id,
+      country_code,
+      area_code,
+      monthly_cost: purchasedNumber.monthly_cost || 1.00,
+      webhook_url: `${supabaseUrl}/functions/v1/bland-integration?action=webhook&client_id=${client_id}`,
+      settings: { purchasedNumber },
+    })
+    .select()
+    .single();
+
+  if (numberError) {
+    console.error('Error storing inbound number:', numberError);
+    throw new Error('Failed to store purchased number');
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    inbound_number: inboundNumber,
+    bland_number: purchasedNumber 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function listInboundNumbers(req: Request) {
+  const url = new URL(req.url);
+  const client_id = url.searchParams.get('client_id');
+
+  if (!client_id) {
+    throw new Error('client_id is required');
+  }
+
+  console.log('Listing inbound numbers for client:', client_id);
+
+  // Get inbound numbers from database
+  const { data: inboundNumbers, error: numbersError } = await supabase
+    .from('bland_inbound_numbers')
+    .select(`
+      *,
+      ai_agents(name),
+      bland_integrations(bland_agent_id)
+    `)
+    .eq('client_id', client_id)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (numbersError) {
+    console.error('Error fetching inbound numbers:', numbersError);
+    throw new Error('Failed to fetch inbound numbers');
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    inbound_numbers: inboundNumbers || []
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function updateInboundNumber(req: Request) {
+  const { number_id, agent_id, settings = {} } = await req.json();
+
+  console.log('Updating inbound number:', { number_id, agent_id });
+
+  // Update in database
+  const { data: updatedNumber, error: updateError } = await supabase
+    .from('bland_inbound_numbers')
+    .update({
+      agent_id,
+      settings: { ...settings },
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', number_id)
+    .select()
+    .single();
+
+  if (updateError) {
+    console.error('Error updating inbound number:', updateError);
+    throw new Error('Failed to update inbound number');
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    inbound_number: updatedNumber 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function deleteInboundNumber(req: Request) {
+  const { number_id } = await req.json();
+
+  console.log('Deleting inbound number:', number_id);
+
+  // Get the number details first
+  const { data: inboundNumber, error: fetchError } = await supabase
+    .from('bland_inbound_numbers')
+    .select('bland_number_id, phone_number')
+    .eq('id', number_id)
+    .single();
+
+  if (fetchError || !inboundNumber) {
+    throw new Error('Inbound number not found');
+  }
+
+  // Cancel/delete number from Bland AI
+  const deleteResponse = await fetch(`https://api.bland.ai/v1/inbound/${inboundNumber.bland_number_id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${blandApiKey}`,
+    },
+  });
+
+  if (!deleteResponse.ok) {
+    const errorText = await deleteResponse.text();
+    console.error('Bland AI delete number error:', errorText);
+    // Continue with local deletion even if Bland AI fails
+  }
+
+  // Mark as inactive in database
+  const { error: deleteError } = await supabase
+    .from('bland_inbound_numbers')
+    .update({ is_active: false })
+    .eq('id', number_id);
+
+  if (deleteError) {
+    console.error('Error deactivating inbound number:', deleteError);
+    throw new Error('Failed to deactivate inbound number');
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    message: 'Inbound number deleted successfully' 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function getAvailableNumbers(req: Request) {
+  const url = new URL(req.url);
+  const country_code = url.searchParams.get('country_code') || 'US';
+  const area_code = url.searchParams.get('area_code');
+
+  console.log('Getting available numbers:', { country_code, area_code });
+
+  // Get available numbers from Bland AI
+  let numbersUrl = `https://api.bland.ai/v1/inbound/available?country_code=${country_code}`;
+  if (area_code) {
+    numbersUrl += `&area_code=${area_code}`;
+  }
+
+  const numbersResponse = await fetch(numbersUrl, {
+    headers: {
+      'Authorization': `Bearer ${blandApiKey}`,
+    },
+  });
+
+  if (!numbersResponse.ok) {
+    const errorText = await numbersResponse.text();
+    console.error('Bland AI available numbers error:', errorText);
+    throw new Error(`Failed to get available numbers: ${errorText}`);
+  }
+
+  const availableNumbers = await numbersResponse.json();
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    available_numbers: availableNumbers.numbers || []
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
