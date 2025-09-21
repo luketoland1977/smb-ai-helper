@@ -19,7 +19,7 @@ const VoiceDemo = () => {
     });
   };
 
-  const demoPhoneNumber = "(844) 415-2896";
+  const demoPhoneNumber = "Not configured"; // No active Twilio integration found
   const demoEmbedCode = `<!-- AI Voice Assistant Widget -->
 <script>
   window.voiceWidgetConfig = {
@@ -82,15 +82,14 @@ const VoiceDemo = () => {
             </CardHeader>
 
             <CardContent>
-              <div className="bg-gray-50 rounded-lg p-6 text-center mb-6">
-                <h3 className="font-semibold text-lg mb-2">Demo Phone Number</h3>
-                <div 
-                  className="text-3xl font-bold text-blue-600 cursor-pointer hover:text-blue-700"
-                  onClick={() => copyToClipboard(demoPhoneNumber)}
-                >
-                  {demoPhoneNumber}
+              <div className="bg-orange-50 rounded-lg p-6 text-center mb-6 border border-orange-200">
+                <h3 className="font-semibold text-lg mb-2 text-orange-800">Demo Phone Integration</h3>
+                <div className="text-lg font-semibold text-orange-600 mb-2">
+                  ⚠️ Setup Required
                 </div>
-                <p className="text-sm text-gray-600 mt-2">Click to copy • Available 24/7</p>
+                <p className="text-sm text-orange-700">
+                  No Twilio integration configured. Configure a Twilio phone number in the admin panel to enable phone demos.
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -103,13 +102,18 @@ const VoiceDemo = () => {
                 </Button>
                 
                 {selectedDemo === 'phone' && (
-                  <div className="bg-blue-50 rounded-lg p-4 space-y-2 text-sm">
-                    <h4 className="font-semibold text-blue-900">How to test:</h4>
-                    <div className="space-y-1 text-blue-800">
-                      <p>1. Call {demoPhoneNumber} from any phone</p>
-                      <p>2. Wait for the AI greeting</p>
-                      <p>3. Speak naturally - ask questions or request help</p>
-                      <p>4. The AI will respond in real-time</p>
+                  <div className="bg-orange-50 rounded-lg p-4 space-y-2 text-sm border border-orange-200">
+                    <h4 className="font-semibold text-orange-900">Setup Required:</h4>
+                    <div className="space-y-1 text-orange-800">
+                      <p>1. Configure a Twilio account with phone number</p>
+                      <p>2. Add Twilio integration in the admin panel</p>
+                      <p>3. Set up webhook URLs for voice calls</p>
+                      <p>4. Test the integration with a real phone call</p>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-orange-200">
+                      <p className="text-xs text-orange-600">
+                        Visit the admin panel to configure your Twilio integration and get a working demo phone number.
+                      </p>
                     </div>
                   </div>
                 )}
