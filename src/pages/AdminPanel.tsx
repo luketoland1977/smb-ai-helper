@@ -17,10 +17,22 @@ import {
   Globe,
   FileText,
   UserCheck,
-  Zap
+  Zap,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import WorkflowGuide from '@/components/WorkflowGuide';
 
 interface Client {
@@ -80,6 +92,39 @@ const AdminPanel = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAgent = async (agentId: string, agentName: string) => {
+    try {
+      // Delete agent configurations first
+      await supabase
+        .from('agent_configurations')
+        .delete()
+        .eq('agent_id', agentId);
+
+      // Delete the agent
+      const { error } = await supabase
+        .from('ai_agents')
+        .delete()
+        .eq('id', agentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Agent "${agentName}" has been deleted`,
+      });
+
+      // Reload data
+      loadData();
+    } catch (error) {
+      console.error('Error deleting agent:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete agent",
+        variant: "destructive",
+      });
     }
   };
 
@@ -397,6 +442,30 @@ const AdminPanel = () => {
                         <Button variant="ghost" size="sm" onClick={() => navigate(`/agents/${agent.id}/voice-settings`)}>
                           <Headphones className="w-4 h-4" />
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Agent</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{agent.name}"? This action cannot be undone and will remove all associated configurations.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteAgent(agent.id, agent.name)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   ))}
