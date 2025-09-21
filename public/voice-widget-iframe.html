@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            height: 100vh;
+            background: transparent;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .voice-widget {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            padding: 24px;
+            text-align: center;
+            min-width: 280px;
+            max-width: 320px;
+        }
+        
+        .voice-status {
+            margin-bottom: 24px;
+        }
+        
+        .status-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        
+        .status-subtext {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .voice-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: #dc2626;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .voice-button:hover {
+            transform: scale(1.05);
+        }
+        
+        .voice-button.listening {
+            background: #dc2626;
+            animation: pulse 2s infinite;
+        }
+        
+        .voice-button.connected {
+            background: #16a34a;
+        }
+        
+        .voice-button.connecting {
+            background: #f59e0b;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+        
+        .voice-icon {
+            width: 32px;
+            height: 32px;
+        }
+        
+        .voice-controls {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        
+        .control-button {
+            background: #f3f4f6;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 14px;
+            color: #374151;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .control-button:hover {
+            background: #e5e7eb;
+        }
+        
+        .control-button.active {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .transcript {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 60px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #374151;
+            text-align: left;
+            margin-bottom: 16px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .transcript.empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #9ca3af;
+            font-style: italic;
+        }
+        
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-widget">
+        <div class="voice-status">
+            <div class="status-text" id="statusText">Voice Assistant</div>
+            <div class="status-subtext" id="statusSubtext">Click to start conversation</div>
+        </div>
+        
+        <button class="voice-button" id="voiceButton">
+            <svg class="voice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+        </button>
+        
+        <div class="error-message hidden" id="errorMessage"></div>
+        
+        <div class="transcript empty" id="transcript">
+            Your conversation will appear here...
+        </div>
+        
+        <div class="voice-controls">
+            <button class="control-button" id="muteButton">Mute</button>
+            <button class="control-button" id="endButton">End Call</button>
+        </div>
+    </div>
+
+    <script>
+        class VoiceWidget {
+            constructor() {
+                this.isConnected = false;
+                this.isListening = false;
+                this.isMuted = false;
+                this.recognition = null;
+                this.synthesis = window.speechSynthesis;
+                
+                this.elements = {
+                    voiceButton: document.getElementById('voiceButton'),
+                    statusText: document.getElementById('statusText'),
+                    statusSubtext: document.getElementById('statusSubtext'),
+                    transcript: document.getElementById('transcript'),
+                    errorMessage: document.getElementById('errorMessage'),
+                    muteButton: document.getElementById('muteButton'),
+                    endButton: document.getElementById('endButton')
+                };
+                
+                this.initializeEventListeners();
+                this.checkBrowserSupport();
+            }
+            
+            checkBrowserSupport() {
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    this.showError('Speech recognition is not supported in this browser.');
+                    return false;
+                }
+                return true;
+            }
+            
+            initializeEventListeners() {
+                this.elements.voiceButton.addEventListener('click', () => this.toggleConnection());
+                this.elements.muteButton.addEventListener('click', () => this.toggleMute());
+                this.elements.endButton.addEventListener('click', () => this.endConnection());
+            }
+            
+            toggleConnection() {
+                if (this.isConnected) {
+                    this.endConnection();
+                } else {
+                    this.startConnection();
+                }
+            }
+            
+            async startConnection() {
+                try {
+                    this.updateStatus('connecting', 'Connecting...', 'Initializing voice assistant');
+                    
+                    // Request microphone permission
+                    await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    // Initialize speech recognition
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    this.recognition = new SpeechRecognition();
+                    this.recognition.continuous = true;
+                    this.recognition.interimResults = true;
+                    this.recognition.lang = 'en-US';
+                    
+                    this.recognition.onstart = () => {
+                        this.isListening = true;
+                        this.updateStatus('listening', 'Listening...', 'Speak now');
+                    };
+                    
+                    this.recognition.onresult = (event) => {
+                        let finalTranscript = '';
+                        let interimTranscript = '';
+                        
+                        for (let i = event.resultIndex; i < event.results.length; i++) {
+                            const transcript = event.results[i][0].transcript;
+                            if (event.results[i].isFinal) {
+                                finalTranscript += transcript;
+                            } else {
+                                interimTranscript += transcript;
+                            }
+                        }
+                        
+                        if (finalTranscript) {
+                            this.addToTranscript(`You: ${finalTranscript}`);
+                            this.processUserInput(finalTranscript);
+                        }
+                    };
+                    
+                    this.recognition.onerror = (event) => {
+                        this.showError(`Speech recognition error: ${event.error}`);
+                    };
+                    
+                    this.recognition.onend = () => {
+                        if (this.isConnected && !this.isMuted) {
+                            // Restart recognition if still connected
+                            setTimeout(() => {
+                                if (this.isConnected) {
+                                    this.recognition.start();
+                                }
+                            }, 100);
+                        }
+                    };
+                    
+                    this.recognition.start();
+                    this.isConnected = true;
+                    this.updateStatus('connected', 'Connected', 'Voice assistant active');
+                    
+                    // Welcome message
+                    setTimeout(() => {
+                        this.speakResponse("Hello! I'm your AI voice assistant. How can I help you today?");
+                    }, 1000);
+                    
+                } catch (error) {
+                    this.showError('Failed to start voice assistant. Please check your microphone permissions.');
+                    console.error('Connection error:', error);
+                }
+            }
+            
+            endConnection() {
+                this.isConnected = false;
+                this.isListening = false;
+                this.isMuted = false;
+                
+                if (this.recognition) {
+                    this.recognition.stop();
+                    this.recognition = null;
+                }
+                
+                this.synthesis.cancel();
+                this.updateStatus('', 'Voice Assistant', 'Click to start conversation');
+                this.elements.muteButton.textContent = 'Mute';
+                this.elements.muteButton.classList.remove('active');
+            }
+            
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                
+                if (this.isMuted) {
+                    this.recognition?.stop();
+                    this.elements.muteButton.textContent = 'Unmute';
+                    this.elements.muteButton.classList.add('active');
+                    this.updateStatus('connected', 'Muted', 'Voice input disabled');
+                } else {
+                    this.recognition?.start();
+                    this.elements.muteButton.textContent = 'Mute';
+                    this.elements.muteButton.classList.remove('active');
+                    this.updateStatus('listening', 'Listening...', 'Speak now');
+                }
+            }
+            
+            processUserInput(input) {
+                // Simulate AI processing and response
+                const responses = [
+                    "I understand your question. Let me help you with that.",
+                    "That's a great question! Here's what I recommend.",
+                    "I'd be happy to assist you with that request.",
+                    "Thanks for asking! Here's some helpful information.",
+                    "I see what you're looking for. Let me provide some guidance."
+                ];
+                
+                const response = responses[Math.floor(Math.random() * responses.length)];
+                
+                setTimeout(() => {
+                    this.addToTranscript(`AI: ${response}`);
+                    this.speakResponse(response);
+                }, 500 + Math.random() * 1000);
+            }
+            
+            speakResponse(text) {
+                if (this.synthesis.speaking) {
+                    this.synthesis.cancel();
+                }
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                utterance.volume = 0.8;
+                
+                utterance.onstart = () => {
+                    this.updateStatus('connected', 'Speaking...', 'AI is responding');
+                };
+                
+                utterance.onend = () => {
+                    if (this.isConnected && !this.isMuted) {
+                        this.updateStatus('listening', 'Listening...', 'Speak now');
+                    }
+                };
+                
+                this.synthesis.speak(utterance);
+            }
+            
+            addToTranscript(text) {
+                const transcript = this.elements.transcript;
+                if (transcript.classList.contains('empty')) {
+                    transcript.classList.remove('empty');
+                    transcript.textContent = '';
+                }
+                
+                transcript.textContent += (transcript.textContent ? '\n\n' : '') + text;
+                transcript.scrollTop = transcript.scrollHeight;
+            }
+            
+            updateStatus(state, text, subtext) {
+                this.elements.voiceButton.className = `voice-button ${state}`;
+                this.elements.statusText.textContent = text;
+                this.elements.statusSubtext.textContent = subtext;
+            }
+            
+            showError(message) {
+                this.elements.errorMessage.textContent = message;
+                this.elements.errorMessage.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    this.elements.errorMessage.classList.add('hidden');
+                }, 5000);
+            }
+        }
+        
+        // Initialize the widget when the page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            new VoiceWidget();
+        });
+        
+        // Get client configuration from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const primaryColor = urlParams.get('color') || '#dc2626';
+        const clientId = urlParams.get('clientId');
+        const agentId = urlParams.get('agentId');
+        
+        // Apply custom styling
+        if (primaryColor !== '#dc2626') {
+            document.documentElement.style.setProperty('--primary-color', primaryColor);
+        }
+    </script>
+</body>
+</html>

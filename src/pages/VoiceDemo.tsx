@@ -163,17 +163,38 @@ const VoiceDemo = () => {
                     />
                     
                     <div className="bg-purple-50 rounded-lg p-4">
-                      <h4 className="font-semibold text-purple-900 mb-2">Integration Code:</h4>
+                      <h4 className="font-semibold text-purple-900 mb-2">Direct Integration:</h4>
                       <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
                         <pre>{demoEmbedCode}</pre>
                       </div>
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="mt-2"
+                        className="mt-2 mr-2"
                         onClick={() => copyToClipboard(demoEmbedCode)}
                       >
                         Copy Code
+                      </Button>
+                    </div>
+
+                    <div className="bg-purple-50 rounded-lg p-4">
+                      <h4 className="font-semibold text-purple-900 mb-2">Iframe Integration:</h4>
+                      <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
+                        <pre>{`<iframe 
+  src="${window.location.origin}/voice-widget-iframe.html?clientId=demo&agentId=demo&color=%23764ba2" 
+  width="350" 
+  height="400" 
+  frameborder="0"
+  title="AI Voice Widget">
+</iframe>`}</pre>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => copyToClipboard(`<iframe src="${window.location.origin}/voice-widget-iframe.html?clientId=demo&agentId=demo&color=%23764ba2" width="350" height="400" frameborder="0" title="AI Voice Widget"></iframe>`)}
+                      >
+                        Copy Iframe Code
                       </Button>
                     </div>
                   </div>
@@ -226,7 +247,7 @@ const VoiceDemo = () => {
                     <div className="bg-green-50 rounded-lg p-4 text-sm">
                       <h4 className="font-semibold text-green-900 mb-2">How to test:</h4>
                       <div className="space-y-1 text-green-800">
-                        <p>1. Click the chat button in the bottom-right corner</p>
+                        <p>1. Click the chat button in the bottom-left corner</p>
                         <p>2. Type a message and press enter</p>
                         <p>3. AI will respond with text messages</p>
                         <p>4. Perfect for FAQ and support</p>
@@ -234,7 +255,7 @@ const VoiceDemo = () => {
                     </div>
                     
                     <div className="bg-green-50 rounded-lg p-4">
-                      <h4 className="font-semibold text-green-900 mb-2">Integration Code:</h4>
+                      <h4 className="font-semibold text-green-900 mb-2">Direct Integration:</h4>
                       <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
                         <pre>{`<!-- AI Chat Widget -->
 <script>
@@ -250,7 +271,7 @@ const VoiceDemo = () => {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="mt-2"
+                        className="mt-2 mr-2"
                         onClick={() => copyToClipboard(`<!-- AI Chat Widget -->
 <script>
   window.chatWidgetConfig = {
@@ -263,6 +284,27 @@ const VoiceDemo = () => {
 <script src="${window.location.origin}/widget.js"></script>`)}
                       >
                         Copy Code
+                      </Button>
+                    </div>
+
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <h4 className="font-semibold text-green-900 mb-2">Iframe Integration:</h4>
+                      <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
+                        <pre>{`<iframe 
+  src="${window.location.origin}/chat-widget-iframe.html?clientId=demo&agentId=demo&color=%2316a34a" 
+  width="350" 
+  height="500" 
+  frameborder="0"
+  title="AI Chat Widget">
+</iframe>`}</pre>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => copyToClipboard(`<iframe src="${window.location.origin}/chat-widget-iframe.html?clientId=demo&agentId=demo&color=%2316a34a" width="350" height="500" frameborder="0" title="AI Chat Widget"></iframe>`)}
+                      >
+                        Copy Iframe Code
                       </Button>
                     </div>
                   </div>
