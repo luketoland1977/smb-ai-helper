@@ -18,6 +18,7 @@ import RoleRequests from "./pages/RoleRequests";
 import NotFound from "./pages/NotFound";
 import WebSocketTest from "./components/WebSocketTest";
 import VoiceDemo from "./pages/VoiceDemo";
+import VoiceSettings from "./pages/VoiceSettings";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +87,14 @@ const App = () => (
               element={
                 <ProtectedRoute roles={['admin', 'salesperson']}>
                   <AgentForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/agents/:agentId/voice-settings" 
+              element={
+                <ProtectedRoute roles={['admin', 'salesperson']}>
+                  <VoiceSettings />
                 </ProtectedRoute>
               } 
             />

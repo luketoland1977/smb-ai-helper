@@ -390,9 +390,14 @@ const AdminPanel = () => {
                           <p className="text-sm text-muted-foreground truncate">{agent.description}</p>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => navigate(`/agents/${agent.id}`)}>
-                        Configure
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/agents/${agent.id}`)}>
+                          Configure
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/agents/${agent.id}/voice-settings`)}>
+                          <Headphones className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                   {agents.length > 4 && (
