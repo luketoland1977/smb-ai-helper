@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, Send, X, Minimize2, Maximize2, User, Bot } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -64,33 +65,44 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({
     setIsLoading(true);
 
     try {
-      // Simulate AI response (replace with actual API call)
-      setTimeout(() => {
-        const responses = [
-          "I understand your question. Let me help you with that.",
-          "That's a great question! Here's what I recommend...",
-          "I'd be happy to assist you with that. Let me provide some information.",
-          "Thanks for reaching out! I can definitely help you with this.",
-          "I see what you're asking about. Here's my suggestion..."
-        ];
-        
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: responses[Math.floor(Math.random() * responses.length)],
-          timestamp: new Date()
-        };
+      // Call the widget-chat edge function for real AI responses
+      const { data, error } = await supabase.functions.invoke('widget-chat', {
+        body: {
+          message: message,
+          client_id: clientId,
+          agent_id: agentId,
+          session_id: 'demo-session',
+          system_prompt: 'You are a helpful AI customer service assistant. Provide friendly and professional responses.'
+        }
+      });
 
-        setMessages(prev => [...prev, assistantMessage]);
-        setIsLoading(false);
-      }, 1000 + Math.random() * 2000);
+      if (error) {
+        throw error;
+      }
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data.response || 'I apologize, but I encountered an error. Please try again.',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'I apologize, but I encountered an error. Please try again later.',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };
