@@ -318,6 +318,62 @@ const AdminPanel = () => {
           </div>
         )}
 
+        {/* Voice Integrations Section */}
+        {(hasRole('admin') || hasRole('salesperson')) && (
+          <div className="mb-8">
+            <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center">
+              <Headphones className="h-5 w-5 mr-2 text-primary" />
+              Voice Integrations
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/voice-demo')}>
+                <CardHeader>
+                  <CardTitle className="flex items-center text-lg">
+                    <Headphones className="h-5 w-5 mr-2" />
+                    Voice Demo
+                  </CardTitle>
+                  <CardDescription>Test Twilio and Bland AI voice integrations</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="outline" className="w-full">
+                    Try Voice Demo
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-lg">
+                    <Bot className="h-5 w-5 mr-2" />
+                    Bland AI Integration
+                  </CardTitle>
+                  <CardDescription>Configure Bland AI voice agents for automated calls</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="outline" className="w-full" onClick={() => navigate('/voice-settings')}>
+                    Manage Bland AI
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-lg">
+                    <Settings className="h-5 w-5 mr-2" />
+                    Voice Settings
+                  </CardTitle>
+                  <CardDescription>Configure voice settings for all integrations</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="outline" className="w-full" onClick={() => navigate('/voice-settings')}>
+                    Voice Settings
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
         {/* Support Section */}
         {(hasRole('admin') || hasRole('salesperson') || hasRole('support')) && (
           <div className="mb-8">

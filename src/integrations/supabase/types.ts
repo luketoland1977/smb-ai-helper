@@ -147,6 +147,54 @@ export type Database = {
         }
         Relationships: []
       }
+      bland_integrations: {
+        Row: {
+          agent_id: string | null
+          bland_agent_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          last_call_at: string | null
+          phone_number: string
+          settings: Json | null
+          total_calls: number | null
+          updated_at: string
+          voice_settings: Json | null
+          webhook_url: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          bland_agent_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_call_at?: string | null
+          phone_number: string
+          settings?: Json | null
+          total_calls?: number | null
+          updated_at?: string
+          voice_settings?: Json | null
+          webhook_url?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          bland_agent_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_call_at?: string | null
+          phone_number?: string
+          settings?: Json | null
+          total_calls?: number | null
+          updated_at?: string
+          voice_settings?: Json | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           content: string

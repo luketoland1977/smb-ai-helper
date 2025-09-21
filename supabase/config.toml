@@ -1,5 +1,8 @@
 project_id = "ycvvuepfsebqpwmamqgg"
 
+[functions.bland-integration]
+verify_jwt = false
+
 [functions.chat-with-agent]
 verify_jwt = false
 
