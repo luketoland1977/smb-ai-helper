@@ -101,6 +101,15 @@ const VoiceSettings = () => {
   };
 
   const handleSave = async () => {
+    if (!formData.openai_api_key.trim()) {
+      toast({
+        title: "Error",
+        description: "OpenAI API key is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       // Update agent
@@ -285,16 +294,17 @@ const VoiceSettings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="api-key">OpenAI API Key (Optional)</Label>
+              <Label htmlFor="api-key">OpenAI API Key *</Label>
               <Input
                 id="api-key"
                 type="password"
                 placeholder="sk-..."
                 value={formData.openai_api_key}
                 onChange={(e) => setFormData(prev => ({ ...prev, openai_api_key: e.target.value }))}
+                required
               />
               <p className="text-sm text-muted-foreground">
-                Leave empty to use the default API key. Use your own key for better rate limits.
+                Your OpenAI API key is required for voice functionality.
               </p>
             </div>
 
