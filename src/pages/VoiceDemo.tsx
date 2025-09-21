@@ -3,12 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import VoiceInterface from '@/components/VoiceInterface';
-import { Phone, Globe, Mic, Users, ArrowRight, CheckCircle } from 'lucide-react';
+import ChatWidget from '@/components/ChatWidget';
+import { Phone, Globe, Mic, Users, ArrowRight, CheckCircle, MessageSquare } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 const VoiceDemo = () => {
   const { toast } = useToast();
-  const [selectedDemo, setSelectedDemo] = useState<'phone' | 'web' | null>(null);
+  const [selectedDemo, setSelectedDemo] = useState<'phone' | 'web' | 'chat' | null>(null);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -49,7 +50,7 @@ const VoiceDemo = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Demo Options */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">{/* Changed to 3 columns */}
           
           {/* Phone Demo */}
           <Card className={`cursor-pointer transition-all duration-200 ${selectedDemo === 'phone' ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-md'}`}>
@@ -180,6 +181,95 @@ const VoiceDemo = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Chat Widget Demo */}
+          <Card className={`cursor-pointer transition-all duration-200 ${selectedDemo === 'chat' ? 'ring-2 ring-green-500 shadow-lg' : 'hover:shadow-md'}`}>
+            <CardHeader>
+              <div className="flex items-center gap-3 mb-4">
+                <MessageSquare className="w-8 h-8 text-green-600" />
+                <div>
+                  <CardTitle className="text-2xl">Chat Widget</CardTitle>
+                  <CardDescription className="text-base">
+                    Traditional text-based chat widget for websites
+                  </CardDescription>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span>Classic chat experience</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span>Works on all devices</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span>Instant text responses</span>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <div className="space-y-4">
+                <Button 
+                  className="w-full bg-green-600 hover:bg-green-700" 
+                  onClick={() => setSelectedDemo(selectedDemo === 'chat' ? null : 'chat')}
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  {selectedDemo === 'chat' ? 'Hide Chat Widget' : 'Try Chat Widget'}
+                </Button>
+                
+                {selectedDemo === 'chat' && (
+                  <div className="space-y-4">
+                    <div className="bg-green-50 rounded-lg p-4 text-sm">
+                      <h4 className="font-semibold text-green-900 mb-2">How to test:</h4>
+                      <div className="space-y-1 text-green-800">
+                        <p>1. Click the chat button in the bottom-right corner</p>
+                        <p>2. Type a message and press enter</p>
+                        <p>3. AI will respond with text messages</p>
+                        <p>4. Perfect for FAQ and support</p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <h4 className="font-semibold text-green-900 mb-2">Integration Code:</h4>
+                      <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
+                        <pre>{`<!-- AI Chat Widget -->
+<script>
+  window.chatWidgetConfig = {
+    clientId: 'demo-client',
+    agentId: 'demo-agent',
+    position: 'bottom-right',
+    primaryColor: '#16a34a'
+  };
+</script>
+<script src="${window.location.origin}/widget.js"></script>`}</pre>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => copyToClipboard(`<!-- AI Chat Widget -->
+<script>
+  window.chatWidgetConfig = {
+    clientId: 'demo-client',
+    agentId: 'demo-agent',
+    position: 'bottom-right',
+    primaryColor: '#16a34a'
+  };
+</script>
+<script src="${window.location.origin}/widget.js"></script>`)}
+                      >
+                        Copy Code
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Features Comparison */}
@@ -200,7 +290,13 @@ const VoiceDemo = () => {
                   <th className="text-center py-4 px-4">
                     <div className="flex items-center justify-center gap-2">
                       <Globe className="w-5 h-5 text-purple-600" />
-                      <span>Web Widget</span>
+                      <span>Voice Widget</span>
+                    </div>
+                  </th>
+                  <th className="text-center py-4 px-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <MessageSquare className="w-5 h-5 text-green-600" />
+                      <span>Chat Widget</span>
                     </div>
                   </th>
                 </tr>
@@ -214,6 +310,9 @@ const VoiceDemo = () => {
                   <td className="py-4 px-4 text-center">
                     <Badge variant="outline" className="bg-yellow-50 text-yellow-700">Medium</Badge>
                   </td>
+                  <td className="py-4 px-4 text-center">
+                    <Badge variant="outline" className="bg-green-50 text-green-700">Simple</Badge>
+                  </td>
                 </tr>
                 <tr className="border-b">
                   <td className="py-4 px-4 font-medium">Device Compatibility</td>
@@ -223,20 +322,27 @@ const VoiceDemo = () => {
                   <td className="py-4 px-4 text-center">
                     <Badge variant="outline" className="bg-blue-50 text-blue-700">Modern Browsers</Badge>
                   </td>
+                  <td className="py-4 px-4 text-center">
+                    <Badge variant="outline" className="bg-green-50 text-green-700">Universal</Badge>
+                  </td>
                 </tr>
                 <tr className="border-b">
-                  <td className="py-4 px-4 font-medium">Lead Capture</td>
+                  <td className="py-4 px-4 font-medium">Interaction Type</td>
                   <td className="py-4 px-4 text-center">
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700">Phone Number</Badge>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700">Voice Only</Badge>
                   </td>
                   <td className="py-4 px-4 text-center">
-                    <Badge variant="outline" className="bg-green-50 text-green-700">Full Details</Badge>
+                    <Badge variant="outline" className="bg-purple-50 text-purple-700">Voice + Text</Badge>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <Badge variant="outline" className="bg-green-50 text-green-700">Text Only</Badge>
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-4 px-4 font-medium">Use Cases</td>
-                  <td className="py-4 px-4 text-center text-sm">Support Lines, Sales</td>
-                  <td className="py-4 px-4 text-center text-sm">Website Visitors, FAQ</td>
+                  <td className="py-4 px-4 font-medium">Best For</td>
+                  <td className="py-4 px-4 text-center text-sm">Support Lines</td>
+                  <td className="py-4 px-4 text-center text-sm">Modern Sites</td>
+                  <td className="py-4 px-4 text-center text-sm">All Websites</td>
                 </tr>
               </tbody>
             </table>
@@ -247,9 +353,9 @@ const VoiceDemo = () => {
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white p-8 text-center mt-12">
           <h2 className="text-3xl font-bold mb-4">Ready to Transform Your Customer Experience?</h2>
           <p className="text-xl mb-6 opacity-90">
-            Deploy AI voice assistants in minutes, not months. Start with either phone or web integration.
+            Deploy AI assistants in minutes with phone, voice, or chat integration.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">{/* ... rest of the content ... */}
             <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100">
               <Users className="w-5 h-5 mr-2" />
               Schedule Demo Call
@@ -259,9 +365,17 @@ const VoiceDemo = () => {
               Get Started Now
             </Button>
           </div>
+          </div>
         </div>
+
+        {/* Live Widgets */}
+        {selectedDemo === 'chat' && (
+          <ChatWidget 
+            position="bottom-left"
+            primaryColor="#16a34a"
+          />
+        )}
       </div>
-    </div>
   );
 };
 
