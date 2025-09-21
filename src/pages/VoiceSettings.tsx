@@ -61,6 +61,10 @@ const VoiceSettings = () => {
       if (agentsError) throw agentsError;
 
       setAgents(agentsData || []);
+      
+      // Debug: Log the loaded data
+      console.log('Loaded clients:', clientsData);
+      console.log('Loaded agents:', agentsData);
 
       // Set default client if available
       if (clientsData && clientsData.length > 0) {
@@ -88,6 +92,11 @@ const VoiceSettings = () => {
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
   const clientAgents = agents.filter(a => a.client_id === selectedClientId);
+  
+  // Debug: Log the filtered client agents
+  console.log('Selected client ID:', selectedClientId);
+  console.log('All agents:', agents);
+  console.log('Filtered client agents:', clientAgents);
 
   if (loading) {
     return (
