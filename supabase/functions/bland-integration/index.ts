@@ -34,6 +34,16 @@ serve(async (req) => {
         return await handleWebhook(req);
       case 'get-calls':
         return await getCallHistory(req);
+      case 'create-pathway':
+        return await createPathway(req);
+      case 'create-campaign':
+        return await createCampaign(req);
+      case 'update-advanced-settings':
+        return await updateAdvancedSettings(req);
+      case 'create-custom-tool':
+        return await createCustomTool(req);
+      case 'get-analytics':
+        return await getAnalytics(req);
       default:
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,
@@ -66,7 +76,14 @@ async function createBlandAgent(req: Request) {
     throw new Error('Agent not found');
   }
 
-  // Create agent in Bland AI
+  // Get advanced settings if they exist
+  const { data: advancedSettings } = await supabase
+    .from('bland_advanced_settings')
+    .select('*')
+    .eq('integration_id', agent_id)
+    .maybeSingle();
+
+  // Create agent in Bland AI with advanced settings
   const blandAgentData = {
     name: agent.name,
     prompt: agent.system_prompt || `You are ${agent.name}, a helpful AI assistant.`,
@@ -74,6 +91,14 @@ async function createBlandAgent(req: Request) {
     language: voice_settings.language || 'en-US',
     speed: voice_settings.speed || 1.0,
     webhook_url: `${supabaseUrl}/functions/v1/bland-integration?action=webhook&client_id=${client_id}`,
+    // Advanced Bland AI features
+    interruption_threshold: advancedSettings?.interruption_threshold || 50,
+    voicemail_detection: advancedSettings?.voicemail_detection ?? true,
+    silence_timeout: advancedSettings?.silence_timeout || 4,
+    max_call_duration: advancedSettings?.max_call_duration || 1800,
+    transfer_phone_number: advancedSettings?.transfer_settings?.phone_number,
+    custom_greeting: advancedSettings?.custom_greeting,
+    hold_music_url: advancedSettings?.hold_music_url,
   };
 
   console.log('Creating Bland AI agent with data:', blandAgentData);
@@ -271,6 +296,183 @@ async function getCallHistory(req: Request) {
   return new Response(JSON.stringify({ 
     success: true, 
     calls 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function createPathway(req: Request) {
+  const { client_id, integration_id, name, description, pathway_config } = await req.json();
+
+  console.log('Creating Bland AI pathway:', { client_id, integration_id, name });
+
+  // Store pathway in database
+  const { data: pathway, error: pathwayError } = await supabase
+    .from('bland_pathways')
+    .insert({
+      client_id,
+      integration_id,
+      name,
+      description,
+      pathway_config,
+    })
+    .select()
+    .single();
+
+  if (pathwayError) {
+    console.error('Error creating pathway:', pathwayError);
+    throw new Error('Failed to create pathway');
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    pathway 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function createCampaign(req: Request) {
+  const { client_id, integration_id, name, description, target_phone_numbers, campaign_config, schedule_config } = await req.json();
+
+  console.log('Creating Bland AI campaign:', { client_id, integration_id, name });
+
+  // Store campaign in database
+  const { data: campaign, error: campaignError } = await supabase
+    .from('bland_campaigns')
+    .insert({
+      client_id,
+      integration_id,
+      name,
+      description,
+      target_phone_numbers,
+      campaign_config,
+      schedule_config,
+      status: 'draft',
+    })
+    .select()
+    .single();
+
+  if (campaignError) {
+    console.error('Error creating campaign:', campaignError);
+    throw new Error('Failed to create campaign');
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    campaign 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function updateAdvancedSettings(req: Request) {
+  const { integration_id, settings } = await req.json();
+
+  console.log('Updating advanced settings:', { integration_id, settings });
+
+  // Upsert advanced settings
+  const { data: advancedSettings, error: settingsError } = await supabase
+    .from('bland_advanced_settings')
+    .upsert({
+      integration_id,
+      ...settings,
+    })
+    .select()
+    .single();
+
+  if (settingsError) {
+    console.error('Error updating advanced settings:', settingsError);
+    throw new Error('Failed to update advanced settings');
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    settings: advancedSettings 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function createCustomTool(req: Request) {
+  const { client_id, integration_id, tool_name, tool_description, tool_config, endpoint_url, api_key_required } = await req.json();
+
+  console.log('Creating custom tool:', { client_id, integration_id, tool_name });
+
+  // Store custom tool in database
+  const { data: tool, error: toolError } = await supabase
+    .from('bland_custom_tools')
+    .insert({
+      client_id,
+      integration_id,
+      tool_name,
+      tool_description,
+      tool_config,
+      endpoint_url,
+      api_key_required,
+    })
+    .select()
+    .single();
+
+  if (toolError) {
+    console.error('Error creating custom tool:', toolError);
+    throw new Error('Failed to create custom tool');
+  }
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    tool 
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function getAnalytics(req: Request) {
+  const url = new URL(req.url);
+  const integration_id = url.searchParams.get('integration_id');
+
+  if (!integration_id) {
+    throw new Error('integration_id is required');
+  }
+
+  console.log('Getting analytics for integration:', integration_id);
+
+  // Get integration details
+  const { data: integration, error: integrationError } = await supabase
+    .from('bland_integrations')
+    .select('*')
+    .eq('id', integration_id)
+    .single();
+
+  if (integrationError || !integration) {
+    throw new Error('Integration not found');
+  }
+
+  // Get analytics from Bland AI API
+  const analyticsResponse = await fetch(`https://api.bland.ai/v1/calls/analytics?agent_id=${integration.bland_agent_id}`, {
+    headers: {
+      'Authorization': `Bearer ${blandApiKey}`,
+    },
+  });
+
+  if (!analyticsResponse.ok) {
+    const errorText = await analyticsResponse.text();
+    console.error('Bland AI analytics API error:', errorText);
+    throw new Error(`Failed to get analytics: ${errorText}`);
+  }
+
+  const analytics = await analyticsResponse.json();
+
+  // Get campaign data from database
+  const { data: campaigns } = await supabase
+    .from('bland_campaigns')
+    .select('*')
+    .eq('integration_id', integration_id);
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    analytics,
+    campaigns: campaigns || []
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });

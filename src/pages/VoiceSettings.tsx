@@ -7,6 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Phone, Bot, Mic, Settings, ArrowLeft } from "lucide-react";
 import { BlandIntegrationForm } from "@/components/BlandIntegrationForm";
 import { BlandIntegrationList } from "@/components/BlandIntegrationList";
+import { BlandAdvancedSettings } from "@/components/BlandAdvancedSettings";
+import { BlandPathwayManager } from "@/components/BlandPathwayManager";
+import { BlandCampaignManager } from "@/components/BlandCampaignManager";
+import { BlandAnalyticsDashboard } from "@/components/BlandAnalyticsDashboard";
 import { useNavigate } from "react-router-dom";
 
 interface Client {
@@ -26,6 +30,7 @@ const VoiceSettings = () => {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedIntegrationId, setSelectedIntegrationId] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -158,73 +163,167 @@ const VoiceSettings = () => {
                 </TabsList>
 
                 <TabsContent value="bland-ai" className="space-y-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Create Bland AI Integration</h3>
-                      {clientAgents.length > 0 ? (
-                        <BlandIntegrationForm
+                  <Tabs defaultValue="integrations" className="space-y-4">
+                    <TabsList className="grid w-full grid-cols-5">
+                      <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                      <TabsTrigger value="pathways">Pathways</TabsTrigger>
+                      <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+                      <TabsTrigger value="settings">Advanced</TabsTrigger>
+                      <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="integrations" className="space-y-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                          <h3 className="text-lg font-semibold mb-4">Create Bland AI Integration</h3>
+                          {clientAgents.length > 0 ? (
+                            <BlandIntegrationForm
+                              clientId={selectedClientId}
+                              agents={clientAgents}
+                              onSuccess={handleSuccess}
+                            />
+                          ) : (
+                            <Card>
+                              <CardContent className="text-center py-8">
+                                <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                                <h4 className="text-lg font-semibold mb-2">No AI Agents</h4>
+                                <p className="text-muted-foreground mb-4">
+                                  Create an AI agent for {selectedClient.name} first.
+                                </p>
+                                <Button onClick={() => navigate('/agents/new')}>
+                                  Create AI Agent
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </div>
+
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Bot className="h-5 w-5" />
+                              About Bland AI Integration
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              <div>
+                                <h4 className="font-semibold mb-2">Advanced Features</h4>
+                                <ul className="text-sm text-muted-foreground space-y-1">
+                                  <li>• Custom conversation pathways</li>
+                                  <li>• Automated calling campaigns</li>
+                                  <li>• Advanced call settings & controls</li>
+                                  <li>• Real-time analytics & insights</li>
+                                  <li>• A/B testing capabilities</li>
+                                  <li>• Custom tools & integrations</li>
+                                </ul>
+                              </div>
+                              <div>
+                                <h4 className="font-semibold mb-2">Use Cases</h4>
+                                <ul className="text-sm text-muted-foreground space-y-1">
+                                  <li>• Customer outreach & sales</li>
+                                  <li>• Appointment booking & reminders</li>
+                                  <li>• Lead qualification & nurturing</li>
+                                  <li>• Survey collection & feedback</li>
+                                  <li>• Support & follow-up calls</li>
+                                </ul>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Active Integrations</h3>
+                        <BlandIntegrationList
+                          key={refreshKey}
                           clientId={selectedClientId}
-                          agents={clientAgents}
-                          onSuccess={handleSuccess}
+                          onRefresh={() => {
+                            setRefreshKey(prev => prev + 1);
+                            // Auto-select first integration for advanced features
+                            if (!selectedIntegrationId) {
+                              // This will be handled by the BlandIntegrationList component
+                            }
+                          }}
+                        />
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="pathways">
+                      {selectedIntegrationId ? (
+                        <BlandPathwayManager
+                          integrationId={selectedIntegrationId}
+                          clientId={selectedClientId}
                         />
                       ) : (
                         <Card>
                           <CardContent className="text-center py-8">
                             <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                            <h4 className="text-lg font-semibold mb-2">No AI Agents</h4>
-                            <p className="text-muted-foreground mb-4">
-                              Create an AI agent for {selectedClient.name} first.
+                            <h3 className="text-lg font-semibold mb-2">Select an Integration</h3>
+                            <p className="text-muted-foreground">
+                              Choose a Bland AI integration from the Integrations tab to manage conversation pathways
                             </p>
-                            <Button onClick={() => navigate('/agents/new')}>
-                              Create AI Agent
-                            </Button>
                           </CardContent>
                         </Card>
                       )}
-                    </div>
+                    </TabsContent>
 
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Active Integrations</h3>
-                      <BlandIntegrationList
-                        key={refreshKey}
-                        clientId={selectedClientId}
-                        onRefresh={() => setRefreshKey(prev => prev + 1)}
-                      />
-                    </div>
-                  </div>
+                    <TabsContent value="campaigns">
+                      {selectedIntegrationId ? (
+                        <BlandCampaignManager
+                          integrationId={selectedIntegrationId}
+                          clientId={selectedClientId}
+                        />
+                      ) : (
+                        <Card>
+                          <CardContent className="text-center py-8">
+                            <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                            <h3 className="text-lg font-semibold mb-2">Select an Integration</h3>
+                            <p className="text-muted-foreground">
+                              Choose a Bland AI integration from the Integrations tab to manage campaigns
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
 
-                  <Card className="mt-6">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Bot className="h-5 w-5" />
-                        About Bland AI Integration
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <h4 className="font-semibold mb-2">Features</h4>
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            <li>• Automated outbound calls</li>
-                            <li>• Natural conversation flow</li>
-                            <li>• Multiple voice options</li>
-                            <li>• Call analytics and logging</li>
-                            <li>• Webhook integration</li>
-                          </ul>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold mb-2">Use Cases</h4>
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            <li>• Customer outreach</li>
-                            <li>• Appointment booking</li>
-                            <li>• Lead qualification</li>
-                            <li>• Survey collection</li>
-                            <li>• Follow-up calls</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    <TabsContent value="settings">
+                      {selectedIntegrationId ? (
+                        <BlandAdvancedSettings
+                          integrationId={selectedIntegrationId}
+                          clientId={selectedClientId}
+                        />
+                      ) : (
+                        <Card>
+                          <CardContent className="text-center py-8">
+                            <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                            <h3 className="text-lg font-semibold mb-2">Select an Integration</h3>
+                            <p className="text-muted-foreground">
+                              Choose a Bland AI integration from the Integrations tab to configure advanced settings
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="analytics">
+                      {selectedIntegrationId ? (
+                        <BlandAnalyticsDashboard
+                          integrationId={selectedIntegrationId}
+                        />
+                      ) : (
+                        <Card>
+                          <CardContent className="text-center py-8">
+                            <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                            <h3 className="text-lg font-semibold mb-2">Select an Integration</h3>
+                            <p className="text-muted-foreground">
+                              Choose a Bland AI integration from the Integrations tab to view analytics
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+                  </Tabs>
                 </TabsContent>
 
                 <TabsContent value="twilio" className="space-y-6">

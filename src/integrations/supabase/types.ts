@@ -147,6 +147,183 @@ export type Database = {
         }
         Relationships: []
       }
+      bland_advanced_settings: {
+        Row: {
+          a_b_test_config: Json | null
+          analytics_config: Json | null
+          created_at: string
+          custom_greeting: string | null
+          hold_music_url: string | null
+          id: string
+          integration_id: string | null
+          interruption_threshold: number | null
+          max_call_duration: number | null
+          silence_timeout: number | null
+          time_based_rules: Json | null
+          transfer_settings: Json | null
+          updated_at: string
+          voicemail_detection: boolean | null
+          webhook_events: string[] | null
+        }
+        Insert: {
+          a_b_test_config?: Json | null
+          analytics_config?: Json | null
+          created_at?: string
+          custom_greeting?: string | null
+          hold_music_url?: string | null
+          id?: string
+          integration_id?: string | null
+          interruption_threshold?: number | null
+          max_call_duration?: number | null
+          silence_timeout?: number | null
+          time_based_rules?: Json | null
+          transfer_settings?: Json | null
+          updated_at?: string
+          voicemail_detection?: boolean | null
+          webhook_events?: string[] | null
+        }
+        Update: {
+          a_b_test_config?: Json | null
+          analytics_config?: Json | null
+          created_at?: string
+          custom_greeting?: string | null
+          hold_music_url?: string | null
+          id?: string
+          integration_id?: string | null
+          interruption_threshold?: number | null
+          max_call_duration?: number | null
+          silence_timeout?: number | null
+          time_based_rules?: Json | null
+          transfer_settings?: Json | null
+          updated_at?: string
+          voicemail_detection?: boolean | null
+          webhook_events?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bland_advanced_settings_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: true
+            referencedRelation: "bland_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bland_campaigns: {
+        Row: {
+          campaign_config: Json
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          failed_calls: number | null
+          id: string
+          integration_id: string | null
+          name: string
+          schedule_config: Json
+          started_at: string | null
+          status: string
+          successful_calls: number | null
+          target_phone_numbers: string[]
+          total_calls: number | null
+          updated_at: string
+        }
+        Insert: {
+          campaign_config?: Json
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          failed_calls?: number | null
+          id?: string
+          integration_id?: string | null
+          name: string
+          schedule_config?: Json
+          started_at?: string | null
+          status?: string
+          successful_calls?: number | null
+          target_phone_numbers?: string[]
+          total_calls?: number | null
+          updated_at?: string
+        }
+        Update: {
+          campaign_config?: Json
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          failed_calls?: number | null
+          id?: string
+          integration_id?: string | null
+          name?: string
+          schedule_config?: Json
+          started_at?: string | null
+          status?: string
+          successful_calls?: number | null
+          target_phone_numbers?: string[]
+          total_calls?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bland_campaigns_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "bland_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bland_custom_tools: {
+        Row: {
+          api_key_required: boolean | null
+          client_id: string
+          created_at: string
+          endpoint_url: string | null
+          id: string
+          integration_id: string | null
+          is_active: boolean
+          tool_config: Json
+          tool_description: string | null
+          tool_name: string
+          updated_at: string
+        }
+        Insert: {
+          api_key_required?: boolean | null
+          client_id: string
+          created_at?: string
+          endpoint_url?: string | null
+          id?: string
+          integration_id?: string | null
+          is_active?: boolean
+          tool_config?: Json
+          tool_description?: string | null
+          tool_name: string
+          updated_at?: string
+        }
+        Update: {
+          api_key_required?: boolean | null
+          client_id?: string
+          created_at?: string
+          endpoint_url?: string | null
+          id?: string
+          integration_id?: string | null
+          is_active?: boolean
+          tool_config?: Json
+          tool_description?: string | null
+          tool_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bland_custom_tools_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "bland_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bland_integrations: {
         Row: {
           agent_id: string | null
@@ -199,6 +376,50 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bland_pathways: {
+        Row: {
+          client_id: string
+          created_at: string
+          description: string | null
+          id: string
+          integration_id: string | null
+          is_active: boolean
+          name: string
+          pathway_config: Json
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          integration_id?: string | null
+          is_active?: boolean
+          name: string
+          pathway_config?: Json
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          integration_id?: string | null
+          is_active?: boolean
+          name?: string
+          pathway_config?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bland_pathways_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "bland_integrations"
             referencedColumns: ["id"]
           },
         ]
