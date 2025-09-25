@@ -91,6 +91,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/voice-settings" 
+              element={
+                <ProtectedRoute roles={['admin', 'salesperson']}>
+                  <VoiceSettings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/agents/:agentId/voice-settings" 
               element={
                 <ProtectedRoute roles={['admin', 'salesperson']}>
