@@ -42,27 +42,61 @@ const VoiceSettings = () => {
 
   const loadData = async () => {
     try {
-      // Load clients
-      const { data: clientsData, error: clientsError } = await supabase
-        .from('clients')
-        .select('id, name')
-        .order('name');
+      // Fetch user roles first to determine access level
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (rolesError) throw rolesError;
+
+      const isAdmin = rolesData?.some(r => r.role === 'admin');
+
+      // Load clients - admins can see all, others only their assigned clients
+      let clientsQuery = supabase.from('clients').select('id, name');
+      
+      if (!isAdmin) {
+        // Non-admins only see clients they have access to through client_users
+        clientsQuery = supabase
+          .from('clients')
+          .select(`
+            id, name,
+            client_users!inner(user_id)
+          `)
+          .eq('client_users.user_id', user.id);
+      }
+
+      const { data: clientsData, error: clientsError } = await clientsQuery.order('name');
 
       if (clientsError) throw clientsError;
 
       setClients(clientsData || []);
 
-      // Load agents
-      const { data: agentsData, error: agentsError } = await supabase
-        .from('ai_agents')
-        .select('id, name, client_id')
-        .order('name');
+      // Load agents - admins can see all, others only for their clients
+      let agentsQuery = supabase.from('ai_agents').select('id, name, client_id');
+      
+      if (!isAdmin) {
+        // Non-admins only see agents for clients they have access to
+        const clientIds = clientsData?.map(c => c.id) || [];
+        if (clientIds.length > 0) {
+          agentsQuery = agentsQuery.in('client_id', clientIds);
+        } else {
+          agentsQuery = agentsQuery.eq('client_id', 'non-existent-id'); // No results
+        }
+      }
+
+      const { data: agentsData, error: agentsError } = await agentsQuery.order('name');
 
       if (agentsError) throw agentsError;
 
       setAgents(agentsData || []);
       
       // Debug: Log the loaded data
+      console.log('User roles:', rolesData);
+      console.log('Is admin:', isAdmin);
       console.log('Loaded clients:', clientsData);
       console.log('Loaded agents:', agentsData);
 
