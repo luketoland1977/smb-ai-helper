@@ -90,12 +90,6 @@ async function searchKnowledgeBase(clientId, query) {
     return null;
   }
 }
-    return context;
-  } catch (error) {
-    console.error('Error searching knowledge base:', error);
-    return null;
-  }
-}
 
 // Get client and agent info from phone number
 async function getClientAgentInfo(phoneNumber) {
@@ -375,7 +369,7 @@ fastify.register(async (fastify) => {
     });
 
     // Handle incoming messages from Twilio
-    connection.on('message', (message) => {
+    connection.on('message', async (message) => {
       try {
         const data = JSON.parse(message);
 
@@ -426,6 +420,12 @@ fastify.register(async (fastify) => {
       console.log('Client disconnected.');
     });
 
+    // Handle connection errors
+    connection.on('error', (error) => {
+      console.error('WebSocket connection error:', error);
+      if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
+    });
+
     // Handle WebSocket close and errors
     openAiWs.on('close', () => {
       console.log('Disconnected from the OpenAI Realtime API');
@@ -433,6 +433,10 @@ fastify.register(async (fastify) => {
 
     openAiWs.on('error', (error) => {
       console.error('Error in the OpenAI WebSocket:', error);
+      // Don't crash the server on WebSocket errors
+      if (connection && connection.readyState === connection.OPEN) {
+        connection.close();
+      }
     });
   });
 });
