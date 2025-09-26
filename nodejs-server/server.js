@@ -356,7 +356,7 @@ fastify.register(async (fastify) => {
     });
 
     // Listen for messages from the OpenAI WebSocket (and send to Twilio if necessary)
-    openAiWs.on('message', (data) => {
+    openAiWs.on('message', async (data) => {
       try {
         const response = JSON.parse(data);
 
