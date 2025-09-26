@@ -1,0 +1,4 @@
+-- Update webhook URL to point to Railway Node.js server
+UPDATE twilio_integrations 
+SET webhook_url = 'https://nodejs-server-production.up.railway.app/incoming-call'
+WHERE phone_number = '(844) 415-2896';
