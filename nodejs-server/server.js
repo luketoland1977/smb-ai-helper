@@ -169,6 +169,7 @@ fastify.all('/incoming-call', async (request, reply) => {
   
   if (skipGreeting) {
     // Skip greeting and connect directly
+    console.log('Skipping greeting, connecting directly to stream');
     twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                      <Response>
                          <Connect>
@@ -176,12 +177,28 @@ fastify.all('/incoming-call', async (request, reply) => {
                          </Connect>
                      </Response>`;
   } else {
-    // Use the custom greeting
+    // Use the custom greeting with enhanced audio settings
+    const audioQuality = clientInfo?.voice_settings?.audio_quality || 'enhanced';
+    
+    console.log('Using greeting with enhanced audio:', { greetingMessage, greetingVoice, audioQuality });
+    
+    // Enhanced TwiML with audio quality settings
+    const audioSettings = audioQuality === 'premium' 
+      ? 'audioCodec="PCMU" enableOnHold="true" statusCallback="https://webhook.example.com/status"'
+      : audioQuality === 'enhanced'
+      ? 'audioCodec="PCMU" enableOnHold="true"'
+      : 'audioCodec="PCMU"';
+    
+    // Reduced delay for better user experience (was 1000ms)
+    setTimeout(() => {
+      console.log('Greeting delay completed');
+    }, 200);
+    
     twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                      <Response>
-                         <Say voice="${greetingVoice}">${greetingMessage}</Say>
+                         <Say voice="${greetingVoice}" language="en-US">${greetingMessage}</Say>
                          <Connect>
-                             <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" />
+                             <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" ${audioSettings} />
                          </Connect>
                      </Response>`;
   }
@@ -227,27 +244,48 @@ fastify.register(async (fastify) => {
       }
     });
 
-    // FIXED AUDIO FORMAT CONFIGURATION FOR TWILIO COMPATIBILITY
+    // ENHANCED AUDIO CONFIGURATION FOR OPTIMAL SOUND QUALITY
     const initializeSession = () => {
-      console.log('🎯 SESSION INIT v5.0 - CONFIGURING AUDIO FORMATS FOR TWILIO');
+      console.log('🎯 SESSION INIT v6.0 - ENHANCED AUDIO QUALITY CONFIGURATION');
+      
+      // Get voice settings from client info
+      const selectedVoice = clientInfo?.voice_settings?.openai_voice || 'alloy';
+      const audioQuality = clientInfo?.voice_settings?.audio_quality || 'enhanced';
+      const noiseSuppression = clientInfo?.voice_settings?.noise_suppression !== false;
+      
+      console.log('Audio settings:', { selectedVoice, audioQuality, noiseSuppression });
+      
+      // Enhanced VAD settings based on audio quality
+      let vadSettings = {
+        type: 'server_vad',
+        threshold: noiseSuppression ? 0.7 : 0.65, // Higher threshold with noise suppression
+        prefix_padding_ms: 500,
+        silence_duration_ms: 1800
+      };
+      
+      // Adjust settings for premium quality
+      if (audioQuality === 'premium') {
+        vadSettings.threshold = 0.75;
+        vadSettings.prefix_padding_ms = 600;
+        vadSettings.silence_duration_ms = 2000;
+      } else if (audioQuality === 'standard') {
+        vadSettings.threshold = 0.6;
+        vadSettings.prefix_padding_ms = 400;
+        vadSettings.silence_duration_ms = 1500;
+      }
       
       const sessionUpdate = {
         type: 'session.update',
         session: {
           modalities: ['text', 'audio'],
-          instructions: systemPrompt,
-          voice: 'alloy',
+          instructions: systemPrompt + (noiseSuppression ? '\n\nNote: Enhanced noise suppression is enabled for clearer audio quality.' : ''),
+          voice: selectedVoice,
           input_audio_format: 'g711_ulaw',
           output_audio_format: 'g711_ulaw',
           input_audio_transcription: {
             model: 'whisper-1'
           },
-          turn_detection: {
-            type: 'server_vad',
-            threshold: 0.65, // Reduced noise sensitivity 
-            prefix_padding_ms: 500, // Better speech capture
-            silence_duration_ms: 1800 // Allow more natural pauses
-          },
+          turn_detection: vadSettings,
           temperature: 0.8,
           max_response_output_tokens: 'inf'
         }

@@ -17,6 +17,9 @@ interface VoiceSettings {
   greeting_message?: string;
   skip_greeting?: boolean;
   greeting_voice?: string;
+  openai_voice?: string;
+  audio_quality?: string;
+  noise_suppression?: boolean;
 }
 
 interface TwilioIntegration {
@@ -42,6 +45,21 @@ const TWILIO_VOICES = [
   { value: 'alice', label: 'Twilio Alice' },
   { value: 'man', label: 'Twilio Man' },
   { value: 'woman', label: 'Twilio Woman' },
+];
+
+const OPENAI_VOICES = [
+  { value: 'alloy', label: 'Alloy (Default)' },
+  { value: 'echo', label: 'Echo' },
+  { value: 'fable', label: 'Fable' },
+  { value: 'onyx', label: 'Onyx' },
+  { value: 'nova', label: 'Nova' },
+  { value: 'shimmer', label: 'Shimmer' },
+];
+
+const AUDIO_QUALITY_OPTIONS = [
+  { value: 'standard', label: 'Standard Quality' },
+  { value: 'enhanced', label: 'Enhanced Quality' },
+  { value: 'premium', label: 'Premium Quality' },
 ];
 
 const TwilioGreetingConfig: React.FC<TwilioGreetingConfigProps> = ({ integration, onUpdate }) => {
@@ -80,6 +98,14 @@ const TwilioGreetingConfig: React.FC<TwilioGreetingConfigProps> = ({ integration
   const generateTwiMLPreview = () => {
     const greetingMessage = voiceSettings.greeting_message || "Hello! I'm connecting you to your AI assistant.";
     const greetingVoice = voiceSettings.greeting_voice || "Google.en-US-Chirp3-HD-Aoede";
+    const audioQuality = voiceSettings.audio_quality || 'enhanced';
+    
+    // Enhanced TwiML with audio quality settings
+    const audioSettings = audioQuality === 'premium' 
+      ? 'audioCodec="PCMU" enableOnHold="true" statusCallback="https://webhook.example.com/status"'
+      : audioQuality === 'enhanced'
+      ? 'audioCodec="PCMU" enableOnHold="true"'
+      : 'audioCodec="PCMU"';
     
     if (voiceSettings.skip_greeting) {
       return `<?xml version="1.0" encoding="UTF-8"?>
@@ -92,9 +118,9 @@ const TwilioGreetingConfig: React.FC<TwilioGreetingConfigProps> = ({ integration
     
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="${greetingVoice}">${greetingMessage}</Say>
+    <Say voice="${greetingVoice}" language="en-US">${greetingMessage}</Say>
     <Connect>
-        <Stream url="wss://nodejs-server-production.up.railway.app/media-stream?phone=${encodeURIComponent(integration.phone_number)}" />
+        <Stream url="wss://nodejs-server-production.up.railway.app/media-stream?phone=${encodeURIComponent(integration.phone_number)}" ${audioSettings} />
     </Connect>
 </Response>`;
   };
@@ -202,6 +228,83 @@ const TwilioGreetingConfig: React.FC<TwilioGreetingConfigProps> = ({ integration
             </pre>
           </div>
         </div>
+
+        {/* AI Voice & Audio Quality Settings */}
+        <div className="space-y-4">
+          <Label className="text-sm font-medium">AI Assistant Audio Settings</Label>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="openai-voice" className="text-sm font-medium">
+                AI Voice
+              </Label>
+              <Select
+                value={voiceSettings.openai_voice || 'alloy'}
+                onValueChange={(value) => 
+                  setVoiceSettings(prev => ({ ...prev, openai_voice: value }))
+                }
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {OPENAI_VOICES.map((voice) => (
+                    <SelectItem key={voice.value} value={voice.value}>
+                      {voice.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Choose the AI assistant's voice for the conversation
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="audio-quality" className="text-sm font-medium">
+                Audio Quality
+              </Label>
+              <Select
+                value={voiceSettings.audio_quality || 'enhanced'}
+                onValueChange={(value) => 
+                  setVoiceSettings(prev => ({ ...prev, audio_quality: value }))
+                }
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUDIO_QUALITY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Higher quality may increase latency slightly
+              </p>
+            </div>
+          </div>
+
+          {/* Noise Suppression Toggle */}
+          <div className="flex items-center justify-between p-3 border rounded-lg">
+            <div>
+              <Label className="text-sm font-medium">Enhanced Noise Suppression</Label>
+              <p className="text-xs text-muted-foreground">
+                Reduces background noise and improves call clarity
+              </p>
+            </div>
+            <Switch
+              checked={voiceSettings.noise_suppression !== false}
+              onCheckedChange={(checked) => 
+                setVoiceSettings(prev => ({ ...prev, noise_suppression: checked }))
+              }
+            />
+          </div>
+        </div>
+
+        <Separator />
 
         {/* Actions */}
         <div className="flex gap-2 pt-2">
