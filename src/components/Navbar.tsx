@@ -52,7 +52,7 @@ const Navbar = () => {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="text-white border-white hover:border-white/80"
+                    className="text-white border-white hover:border-white/80 bg-transparent hover:bg-transparent"
                     onClick={handleDashboardAction}
                   >
                     <User className="h-4 w-4 mr-2" />
@@ -62,7 +62,7 @@ const Navbar = () => {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="text-white border-white hover:border-white/80"
+                  className="text-white border-white hover:border-white/80 bg-transparent hover:bg-transparent"
                   onClick={handleAuthAction}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
@@ -74,7 +74,7 @@ const Navbar = () => {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="text-white border-white hover:border-white/80"
+                  className="text-white border-white hover:border-white/80 bg-transparent hover:bg-transparent"
                   onClick={handleAuthAction}
                 >
                   Login
