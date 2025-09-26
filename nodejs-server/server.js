@@ -177,30 +177,42 @@ fastify.all('/incoming-call', async (request, reply) => {
                          </Connect>
                      </Response>`;
   } else {
-    // Use the custom greeting with enhanced audio settings
-    const audioQuality = clientInfo?.voice_settings?.audio_quality || 'enhanced';
-    
-    console.log('Using greeting with enhanced audio:', { greetingMessage, greetingVoice, audioQuality });
-    
-    // Enhanced TwiML with audio quality settings
-    const audioSettings = audioQuality === 'premium' 
-      ? 'audioCodec="PCMU" enableOnHold="true" statusCallback="https://webhook.example.com/status"'
-      : audioQuality === 'enhanced'
-      ? 'audioCodec="PCMU" enableOnHold="true"'
-      : 'audioCodec="PCMU"';
-    
-    // Reduced delay for better user experience (was 1000ms)
-    setTimeout(() => {
-      console.log('Greeting delay completed');
-    }, 200);
-    
-    twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
-                     <Response>
-                         <Say voice="${greetingVoice}" language="en-US">${greetingMessage}</Say>
-                         <Connect>
-                             <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" ${audioSettings} />
-                         </Connect>
-                     </Response>`;
+    try {
+      // Use the custom greeting with enhanced audio settings
+      const audioQuality = integration?.voice_settings?.audio_quality || 'enhanced';
+      
+      console.log('Using greeting with enhanced audio:', { greetingMessage, greetingVoice, audioQuality });
+      
+      // Enhanced TwiML with audio quality settings
+      const audioSettings = audioQuality === 'premium' 
+        ? 'audioCodec="PCMU" enableOnHold="true" statusCallback="https://webhook.example.com/status"'
+        : audioQuality === 'enhanced'
+        ? 'audioCodec="PCMU" enableOnHold="true"'
+        : 'audioCodec="PCMU"';
+      
+      // Reduced delay for better user experience (was 1000ms)
+      setTimeout(() => {
+        console.log('Greeting delay completed');
+      }, 200);
+      
+      twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+                       <Response>
+                           <Say voice="${greetingVoice}" language="en-US">${greetingMessage}</Say>
+                           <Connect>
+                               <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" ${audioSettings} />
+                           </Connect>
+                       </Response>`;
+    } catch (error) {
+      console.error('Error generating TwiML with custom greeting:', error);
+      // Fallback to basic TwiML if there's an error
+      twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+                       <Response>
+                           <Say voice="alice" language="en-US">Hello, connecting you now.</Say>
+                           <Connect>
+                               <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" />
+                           </Connect>
+                       </Response>`;
+    }
   }
 
   reply.type('text/xml').send(twimlResponse);
