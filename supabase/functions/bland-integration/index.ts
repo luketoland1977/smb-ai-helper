@@ -23,7 +23,19 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const action = url.searchParams.get('action') || 'webhook';
+    let action = url.searchParams.get('action') || 'webhook';
+
+    // For POST requests, check the body for action
+    if (req.method === 'POST') {
+      try {
+        const body = await req.clone().json();
+        if (body.action) {
+          action = body.action;
+        }
+      } catch (e) {
+        // If body parsing fails, continue with URL param action
+      }
+    }
 
     switch (action) {
       case 'create-agent':
@@ -53,14 +65,17 @@ serve(async (req) => {
       case 'delete-inbound-number':
         return await deleteInboundNumber(req);
       case 'get-available-numbers':
+      case 'search-numbers':
         return await getAvailableNumbers(req);
+      case 'purchase-number':
+        return await purchaseNumber(req);
       default:
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in bland-integration function:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
@@ -664,9 +679,7 @@ async function deleteInboundNumber(req: Request) {
 }
 
 async function getAvailableNumbers(req: Request) {
-  const url = new URL(req.url);
-  const country_code = url.searchParams.get('country_code') || 'US';
-  const area_code = url.searchParams.get('area_code');
+  const { area_code, country_code = 'US' } = await req.json();
 
   console.log('Getting available numbers:', { country_code, area_code });
 
@@ -689,10 +702,53 @@ async function getAvailableNumbers(req: Request) {
   }
 
   const availableNumbers = await numbersResponse.json();
+  console.log('Available numbers from Bland AI:', availableNumbers);
+
+  // Transform the data to match frontend expectations
+  const numbers = (availableNumbers.numbers || []).map((num: any) => ({
+    number: num.phone_number,
+    price: num.monthly_cost || 5.0, // Default price if not provided
+    area_code: num.area_code,
+    region: num.region || num.location || 'Unknown'
+  }));
 
   return new Response(JSON.stringify({ 
     success: true, 
-    available_numbers: availableNumbers.numbers || []
+    numbers: numbers
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function purchaseNumber(req: Request) {
+  const { phone_number } = await req.json();
+
+  console.log('Purchasing phone number:', phone_number);
+
+  // Purchase number from Bland AI
+  const purchaseResponse = await fetch('https://api.bland.ai/v1/inbound', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${blandApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      phone_number: phone_number,
+    }),
+  });
+
+  if (!purchaseResponse.ok) {
+    const errorText = await purchaseResponse.text();
+    console.error('Bland AI purchase number error:', errorText);
+    throw new Error(`Failed to purchase number: ${errorText}`);
+  }
+
+  const purchaseResult = await purchaseResponse.json();
+  console.log('Number purchased successfully:', purchaseResult);
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    number: purchaseResult
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
