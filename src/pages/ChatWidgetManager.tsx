@@ -40,6 +40,7 @@ interface TwilioIntegration {
   client_id: string;
   agent_id: string;
   account_sid: string;
+  auth_token: string;
   phone_number: string;
   is_active: boolean;
   sms_enabled: boolean;
@@ -100,6 +101,7 @@ const ChatWidgetManager = () => {
     client_id: '',
     agent_id: '',
     account_sid: '',
+    auth_token: '',
     phone_number: '',
     sms_enabled: true,
     voice_enabled: true,
@@ -338,10 +340,20 @@ const ChatWidgetManager = () => {
   };
 
   const createTwilioIntegration = async () => {
-    if (!twilioFormData.client_id || !twilioFormData.agent_id || !twilioFormData.phone_number || !twilioFormData.account_sid) {
+    if (!twilioFormData.client_id || !twilioFormData.agent_id || !twilioFormData.phone_number || !twilioFormData.account_sid || !twilioFormData.auth_token) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields including Account SID and Auth Token",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate Account SID format
+    if (!twilioFormData.account_sid.startsWith('AC') || twilioFormData.account_sid.length !== 34) {
+      toast({
+        title: "Invalid Account SID",
+        description: "Account SID must start with 'AC' and be 34 characters long",
         variant: "destructive",
       });
       return;
@@ -354,6 +366,7 @@ const ChatWidgetManager = () => {
           client_id: twilioFormData.client_id,
           agent_id: twilioFormData.agent_id,
           account_sid: twilioFormData.account_sid,
+          auth_token: twilioFormData.auth_token,
           phone_number: twilioFormData.phone_number,
           sms_enabled: twilioFormData.sms_enabled,
           voice_enabled: twilioFormData.voice_enabled,
@@ -381,6 +394,7 @@ const ChatWidgetManager = () => {
         client_id: '',
         agent_id: '',
         account_sid: '',
+        auth_token: '',
         phone_number: '',
         sms_enabled: true,
         voice_enabled: true,
@@ -929,25 +943,56 @@ const ChatWidgetManager = () => {
                     </div>
                   </div>
 
+                  <div className="space-y-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                      <span className="font-medium text-amber-900 text-sm">Security Notice</span>
+                    </div>
+                    <p className="text-xs text-amber-800">
+                      Your Twilio credentials will be securely stored and used only for your phone integrations. 
+                      Find these credentials in your Twilio Console under Account → Account Settings.
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="account-sid">Twilio Account SID</Label>
+                      <Label htmlFor="account-sid">Twilio Account SID *</Label>
                       <Input
                         id="account-sid"
                         placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                         value={twilioFormData.account_sid}
                         onChange={(e) => setTwilioFormData({...twilioFormData, account_sid: e.target.value})}
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Starts with "AC" - 34 characters total
+                      </p>
                     </div>
                     <div>
-                      <Label htmlFor="phone-number">Phone Number</Label>
+                      <Label htmlFor="auth-token">Twilio Auth Token *</Label>
                       <Input
-                        id="phone-number"
-                        placeholder="+1234567890"
-                        value={twilioFormData.phone_number}
-                        onChange={(e) => setTwilioFormData({...twilioFormData, phone_number: e.target.value})}
+                        id="auth-token"
+                        type="password"
+                        placeholder="Your Twilio Auth Token"
+                        value={twilioFormData.auth_token}
+                        onChange={(e) => setTwilioFormData({...twilioFormData, auth_token: e.target.value})}
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        32-character secret token
+                      </p>
                     </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="phone-number">Phone Number *</Label>
+                    <Input
+                      id="phone-number"
+                      placeholder="+1234567890"
+                      value={twilioFormData.phone_number}
+                      onChange={(e) => setTwilioFormData({...twilioFormData, phone_number: e.target.value})}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Include country code (e.g., +1 for US numbers)
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -1082,9 +1127,12 @@ const ChatWidgetManager = () => {
                                  {integration.is_active ? "Active" : "Inactive"}
                                </Badge>
                              </CardTitle>
-                             <CardDescription>
-                               Created {new Date(integration.created_at).toLocaleDateString()}
-                             </CardDescription>
+                              <CardDescription className="space-y-1">
+                                <div>Created {new Date(integration.created_at).toLocaleDateString()}</div>
+                                <div className="text-xs font-mono">
+                                  Account SID: {integration.account_sid ? `${integration.account_sid.substring(0, 8)}...${integration.account_sid.substring(30)}` : 'Not configured'}
+                                </div>
+                              </CardDescription>
                            </div>
                            <div className="flex gap-2">
                              <Button

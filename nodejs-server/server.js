@@ -101,6 +101,8 @@ async function getClientAgentInfo(phoneNumber) {
       .select(`
         client_id,
         agent_id,
+        account_sid,
+        auth_token,
         voice_settings,
         clients(name),
         ai_agents(name, system_prompt)
