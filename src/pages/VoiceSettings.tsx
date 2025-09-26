@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Phone, Bot, Mic, Settings, ArrowLeft } from "lucide-react";
+import { Phone, Bot, Mic, Settings, ArrowLeft, Search, X } from "lucide-react";
 import { BlandIntegrationForm } from "@/components/BlandIntegrationForm";
 import { BlandIntegrationList } from "@/components/BlandIntegrationList";
 import { BlandAdvancedSettings } from "@/components/BlandAdvancedSettings";
@@ -33,12 +34,34 @@ const VoiceSettings = () => {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
+  const searchRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Filter clients based on search term
+  const filteredClients = clients.filter(client => 
+    client.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const loadData = async () => {
     try {
@@ -95,7 +118,7 @@ const VoiceSettings = () => {
       setAgents(agentsData || []);
       
       // Auto-select the first client that has agents (prioritize "Demo" client)
-      if (clientsData && clientsData.length > 0 && !selectedClient) {
+      if (clientsData && clientsData.length > 0 && !selectedClientId) {
         // First try to find "Demo" client
         const demoClient = clientsData.find(c => c.name?.toLowerCase().includes('demo'));
         
@@ -103,6 +126,7 @@ const VoiceSettings = () => {
           const demoClientAgents = agentsData?.filter(a => a.client_id === demoClient.id) || [];
           if (demoClientAgents.length > 0) {
             setSelectedClientId(demoClient.id);
+            setSearchTerm(demoClient.name);
             return;
           }
         }
@@ -112,6 +136,7 @@ const VoiceSettings = () => {
           const clientAgents = agentsData?.filter(a => a.client_id === client.id) || [];
           if (clientAgents.length > 0) {
             setSelectedClientId(client.id);
+            setSearchTerm(client.name);
             break;
           }
         }
@@ -120,11 +145,6 @@ const VoiceSettings = () => {
       console.log('Loaded clients:', clientsData);
       console.log('Loaded agents:', agentsData);
       console.log('Auto-selected client:', selectedClient);
-
-      // Set default client if available
-      if (clientsData && clientsData.length > 0) {
-        setSelectedClientId(clientsData[0].id);
-      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -143,6 +163,29 @@ const VoiceSettings = () => {
       title: "Success",
       description: "Voice integration updated successfully.",
     });
+  };
+
+  // Handle client selection from search dropdown
+  const handleClientSelect = (client: Client) => {
+    setSelectedClientId(client.id);
+    setSearchTerm(client.name);
+    setShowDropdown(false);
+  };
+
+  // Handle search input changes
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setShowDropdown(true);
+    if (value === "") {
+      setSelectedClientId("");
+    }
+  };
+
+  // Clear search and selection
+  const handleClearSearch = () => {
+    setSearchTerm("");
+    setSelectedClientId("");
+    setShowDropdown(false);
   };
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
@@ -199,21 +242,51 @@ const VoiceSettings = () => {
           </Card>
         ) : (
           <>
-            {/* Client Selector */}
-            <div className="mb-6">
+            {/* Client Search Field */}
+            <div className="mb-6" ref={searchRef}>
               <label className="block text-sm font-medium mb-2">Select Client</label>
-              <select
-                value={selectedClientId}
-                onChange={(e) => setSelectedClientId(e.target.value)}
-                className="w-full max-w-md px-3 py-2 border border-border rounded-md bg-background"
-              >
-                <option value="">Select a client...</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative w-full max-w-md">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    type="text"
+                    placeholder="Search clients..."
+                    value={searchTerm}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onFocus={() => setShowDropdown(true)}
+                    className="pl-10 pr-10"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={handleClearSearch}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                
+                {/* Search Results Dropdown */}
+                {showDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                    {filteredClients.length > 0 ? (
+                      filteredClients.map((client) => (
+                        <button
+                          key={client.id}
+                          onClick={() => handleClientSelect(client)}
+                          className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none"
+                        >
+                          {client.name}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-2 text-muted-foreground text-sm">
+                        No clients found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {!selectedClientId ? (
