@@ -101,6 +101,7 @@ async function getClientAgentInfo(phoneNumber) {
       .select(`
         client_id,
         agent_id,
+        voice_settings,
         clients(name),
         ai_agents(name, system_prompt)
       `)
@@ -143,13 +144,47 @@ fastify.all('/incoming-call', async (request, reply) => {
   const toNumber = request.body?.To || request.query?.To;
   console.log('Called Twilio number:', toNumber);
   
-  const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
-                        <Response>
-                            <Say voice="Google.en-US-Chirp3-HD-Aoede">Hello! I'm connecting you to your AI assistant.</Say>
-                            <Connect>
-                                <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" />
-                            </Connect>
-                        </Response>`;
+  // Look up the integration to get greeting settings
+  let greetingMessage = 'Hello! I\'m connecting you to your AI assistant.';
+  let skipGreeting = false;
+  let greetingVoice = 'Google.en-US-Chirp3-HD-Aoede';
+  
+  if (toNumber) {
+    const integration = await getClientAgentInfo(toNumber);
+    if (integration && integration.voice_settings) {
+      const voiceSettings = integration.voice_settings;
+      greetingMessage = voiceSettings.greeting_message || greetingMessage;
+      skipGreeting = voiceSettings.skip_greeting || false;
+      greetingVoice = voiceSettings.greeting_voice || greetingVoice;
+      
+      console.log('Using custom greeting settings:', {
+        message: greetingMessage,
+        skipGreeting,
+        voice: greetingVoice
+      });
+    }
+  }
+  
+  let twimlResponse;
+  
+  if (skipGreeting) {
+    // Skip greeting and connect directly
+    twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+                     <Response>
+                         <Connect>
+                             <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" />
+                         </Connect>
+                     </Response>`;
+  } else {
+    // Use the custom greeting
+    twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+                     <Response>
+                         <Say voice="${greetingVoice}">${greetingMessage}</Say>
+                         <Connect>
+                             <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" />
+                         </Connect>
+                     </Response>`;
+  }
 
   reply.type('text/xml').send(twimlResponse);
 });

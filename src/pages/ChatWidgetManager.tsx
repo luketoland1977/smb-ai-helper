@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import TwilioGreetingConfig from '@/components/TwilioGreetingConfig';
 
 interface ChatWidget {
   id: string;
@@ -477,6 +478,16 @@ const ChatWidgetManager = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleUpdateTwilioSettings = (integrationId: string, updatedSettings: Record<string, any>) => {
+    setTwilioIntegrations(prev => 
+      prev.map(integration => 
+        integration.id === integrationId 
+          ? { ...integration, voice_settings: updatedSettings }
+          : integration
+      )
+    );
   };
 
   if (loading) {
@@ -1060,119 +1071,133 @@ const ChatWidgetManager = () => {
                   </CardContent>
                 </Card>
               ) : (
-                twilioIntegrations.map((integration) => (
-                  <Card key={integration.id}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            {integration.phone_number}
-                            <Badge variant={integration.is_active ? "default" : "secondary"}>
-                              {integration.is_active ? "Active" : "Inactive"}
-                            </Badge>
-                          </CardTitle>
-                          <CardDescription>
-                            Created {new Date(integration.created_at).toLocaleDateString()}
-                          </CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteTwilioIntegration(integration.id)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                     <CardContent>
-                       <div className="space-y-4">
-                         <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p><strong>SMS:</strong> {integration.sms_enabled ? 'Enabled' : 'Disabled'}</p>
-                              <p><strong>Voice:</strong> {integration.voice_enabled ? 'Enabled (ElevenLabs Aria)' : 'Disabled'}</p>
-                            </div>
-                            <div>
-                              <p><strong>Voice AI:</strong> ElevenLabs Aria</p>
-                              <p><strong>Language:</strong> {integration.voice_settings?.language || 'en-US'}</p>
-                            </div>
-                         </div>
-                         
-                         <div>
-                           <h4 className="font-medium mb-2">Configuration</h4>
-                           <div className="bg-muted p-3 rounded text-sm">
-                             <p><strong>Account SID:</strong> {integration.account_sid}</p>
-                             <p><strong>Agent:</strong> {agents.find(a => a.id === integration.agent_id)?.name || 'Unknown Agent'}</p>
-                             <p><strong>Client:</strong> {clients.find(c => c.id === integration.client_id)?.name || 'Unknown Client'}</p>
-                           </div>
-                         </div>
-
-                         {integration.voice_settings?.welcome_message && (
+                 twilioIntegrations.map((integration) => (
+                   <div key={integration.id} className="space-y-4">
+                     <Card>
+                       <CardHeader>
+                         <div className="flex justify-between items-start">
                            <div>
-                             <h4 className="font-medium mb-2">Welcome Message</h4>
-                             <div className="bg-muted p-3 rounded text-sm">
-                               <p>{integration.voice_settings.welcome_message}</p>
-                             </div>
+                             <CardTitle className="flex items-center gap-2">
+                               {integration.phone_number}
+                               <Badge variant={integration.is_active ? "default" : "secondary"}>
+                                 {integration.is_active ? "Active" : "Inactive"}
+                               </Badge>
+                             </CardTitle>
+                             <CardDescription>
+                               Created {new Date(integration.created_at).toLocaleDateString()}
+                             </CardDescription>
                            </div>
-                         )}
-                         
-                         <div className="border-t pt-4">
-                           <h4 className="font-medium mb-2">Webhook Configuration</h4>
-                           <p className="text-xs text-muted-foreground mb-3">
-                             Copy these URLs and paste them in your Twilio Console under your phone number settings:
-                           </p>
-                           
-                           <div className="space-y-3">
-                             <div>
-                               <label className="text-xs font-medium text-muted-foreground">Voice Webhook URL:</label>
-                               <div className="flex gap-2 mt-1">
-                                 <input
-                                   type="text"
-                                   value={generateWebhookUrls().voice}
-                                   readOnly
-                                   className="flex-1 px-2 py-1 text-xs border rounded font-mono"
-                                 />
-                                 <Button
-                                   size="sm"
-                                   variant="outline"
-                                   onClick={() => copyToClipboard(generateWebhookUrls().voice)}
-                                   className="px-3"
-                                 >
-                                   <Copy className="h-3 w-3" />
-                                 </Button>
-                               </div>
-                             </div>
-                             
-                             <div>
-                               <label className="text-xs font-medium text-muted-foreground">SMS Webhook URL:</label>
-                               <div className="flex gap-2 mt-1">
-                                 <input
-                                   type="text"
-                                   value={generateWebhookUrls().sms}
-                                   readOnly
-                                   className="flex-1 px-2 py-1 text-xs border rounded font-mono"
-                                 />
-                                 <Button
-                                   size="sm"
-                                   variant="outline"
-                                   onClick={() => copyToClipboard(generateWebhookUrls().sms)}
-                                   className="px-3"
-                                 >
-                                   <Copy className="h-3 w-3" />
-                                 </Button>
-                               </div>
-                             </div>
+                           <div className="flex gap-2">
+                             <Button
+                               variant="destructive"
+                               size="sm"
+                               onClick={() => handleDeleteTwilioIntegration(integration.id)}
+                             >
+                               Delete
+                             </Button>
                            </div>
-                           
-                           <p className="text-xs text-muted-foreground mt-3">
-                             💡 In Twilio Console: Phone Numbers → Manage → Active Numbers → Select your number → Configure webhooks
-                           </p>
                          </div>
-                       </div>
-                     </CardContent>
-                  </Card>
-                ))
+                       </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                               <div>
+                                 <p><strong>SMS:</strong> {integration.sms_enabled ? 'Enabled' : 'Disabled'}</p>
+                                 <p><strong>Voice:</strong> {integration.voice_enabled ? 'Enabled (ElevenLabs Aria)' : 'Disabled'}</p>
+                               </div>
+                               <div>
+                                 <p><strong>Voice AI:</strong> ElevenLabs Aria</p>
+                                 <p><strong>Language:</strong> {integration.voice_settings?.language || 'en-US'}</p>
+                               </div>
+                            </div>
+                            
+                            <div>
+                              <h4 className="font-medium mb-2">Configuration</h4>
+                              <div className="bg-muted p-3 rounded text-sm">
+                                <p><strong>Account SID:</strong> {integration.account_sid}</p>
+                                <p><strong>Agent:</strong> {agents.find(a => a.id === integration.agent_id)?.name || 'Unknown Agent'}</p>
+                                <p><strong>Client:</strong> {clients.find(c => c.id === integration.client_id)?.name || 'Unknown Client'}</p>
+                              </div>
+                            </div>
+
+                            {integration.voice_settings?.welcome_message && (
+                              <div>
+                                <h4 className="font-medium mb-2">Welcome Message</h4>
+                                <div className="bg-muted p-3 rounded text-sm">
+                                  <p>{integration.voice_settings.welcome_message}</p>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="border-t pt-4">
+                              <h4 className="font-medium mb-2">Webhook Configuration</h4>
+                              <p className="text-xs text-muted-foreground mb-3">
+                                Copy these URLs and paste them in your Twilio Console under your phone number settings:
+                              </p>
+                              
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="text-xs font-medium text-muted-foreground">Voice Webhook URL:</label>
+                                  <div className="flex gap-2 mt-1">
+                                    <input
+                                      type="text"
+                                      value={generateWebhookUrls().voice}
+                                      readOnly
+                                      className="flex-1 px-2 py-1 text-xs border rounded font-mono"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => copyToClipboard(generateWebhookUrls().voice)}
+                                      className="px-3"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                
+                                <div>
+                                  <label className="text-xs font-medium text-muted-foreground">SMS Webhook URL:</label>
+                                  <div className="flex gap-2 mt-1">
+                                    <input
+                                      type="text"
+                                      value={generateWebhookUrls().sms}
+                                      readOnly
+                                      className="flex-1 px-2 py-1 text-xs border rounded font-mono"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => copyToClipboard(generateWebhookUrls().sms)}
+                                      className="px-3"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <p className="text-xs text-muted-foreground mt-3">
+                                💡 In Twilio Console: Phone Numbers → Manage → Active Numbers → Select your number → Configure webhooks
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                     </Card>
+                     
+                     {/* Greeting Configuration */}
+                     <TwilioGreetingConfig 
+                       integration={{
+                         id: integration.id,
+                         phone_number: integration.phone_number,
+                         voice_settings: integration.voice_settings || {},
+                         clients: clients.find(c => c.id === integration.client_id),
+                         ai_agents: agents.find(a => a.id === integration.agent_id)
+                       }}
+                       onUpdate={handleUpdateTwilioSettings}
+                     />
+                   </div>
+                 ))
               )}
             </div>
           </TabsContent>
