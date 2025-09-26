@@ -76,7 +76,22 @@ serve(async (req) => {
       });
     }
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    // Get agent-specific OpenAI API key or fall back to global key
+    let openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    
+    if (agent_id) {
+      const { data: agent, error } = await supabase
+        .from('ai_agents')
+        .select('openai_api_key')
+        .eq('id', agent_id)
+        .single();
+      
+      if (!error && agent?.openai_api_key) {
+        openAIApiKey = agent.openai_api_key;
+        console.log('Using agent-specific OpenAI API key');
+      }
+    }
+    
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
     }

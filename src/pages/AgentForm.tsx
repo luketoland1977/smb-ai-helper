@@ -26,6 +26,7 @@ const AgentForm = () => {
     description: '',
     client_id: '',
     system_prompt: '',
+    openai_api_key: '',
     status: 'active' as 'active' | 'inactive' | 'training'
   });
 
@@ -77,6 +78,7 @@ const AgentForm = () => {
         description: data.description || '',
         client_id: data.client_id,
         system_prompt: data.system_prompt || '',
+        openai_api_key: data.openai_api_key || '',
         status: data.status
       });
     }
@@ -231,6 +233,40 @@ Guidelines:
                     <SelectItem value="training">Training</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="openai_api_key">OpenAI API Key (Optional)</Label>
+                <Input
+                  id="openai_api_key"
+                  type="password"
+                  value={formData.openai_api_key}
+                  onChange={(e) => setFormData({ ...formData, openai_api_key: e.target.value })}
+                  placeholder="sk-..."
+                />
+                <p className="text-sm text-muted-foreground">
+                  Agent-specific OpenAI API key. Leave blank to use the global API key.
+                </p>
+                <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded-md border border-amber-200">
+                  <strong>Security Note:</strong> API keys are securely stored and encrypted. Only provide keys from trusted sources.
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="openai_api_key">OpenAI API Key (Optional)</Label>
+                <Input
+                  id="openai_api_key"
+                  type="password"
+                  value={formData.openai_api_key}
+                  onChange={(e) => setFormData({ ...formData, openai_api_key: e.target.value })}
+                  placeholder="sk-..."
+                />
+                <p className="text-sm text-muted-foreground">
+                  Agent-specific OpenAI API key. Leave blank to use the global API key.
+                </p>
+                <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded-md border border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">
+                  <strong>Security Note:</strong> API keys are securely stored and encrypted. Only provide keys from trusted sources.
+                </div>
               </div>
 
               <div className="space-y-2">

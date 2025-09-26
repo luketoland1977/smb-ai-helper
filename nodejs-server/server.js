@@ -105,7 +105,7 @@ async function getClientAgentInfo(phoneNumber) {
         auth_token,
         voice_settings,
         clients(name),
-        ai_agents(name, system_prompt)
+        ai_agents(name, system_prompt, openai_api_key)
       `)
       .eq('phone_number', phoneNumber)
       .eq('is_active', true)
@@ -262,9 +262,18 @@ fastify.register(async (fastify) => {
     let markQueue = [];
     let responseStartTimestampTwilio = null;
 
+    // Determine which OpenAI API key to use
+    let openaiApiKey = OPENAI_API_KEY;
+    if (clientInfo?.ai_agents?.openai_api_key) {
+      openaiApiKey = clientInfo.ai_agents.openai_api_key;
+      console.log('Using agent-specific OpenAI API key');
+    } else {
+      console.log('Using global OpenAI API key');
+    }
+
     const openAiWs = new WebSocket(`wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`, {
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openaiApiKey}`,
         'OpenAI-Beta': 'realtime=v1'
       }
     });
