@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Upload, FileText, Trash2, Download, Link, Globe, Settings, Database } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Trash2, Download, Link, Globe, Settings, Database, Type } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,7 +21,7 @@ interface Document {
   file_path: string;
   processed: boolean;
   created_at: string;
-  source_type: 'file' | 'url' | 'crm';
+  source_type: 'file' | 'url' | 'crm' | 'text';
   source_url: string | null;
   crm_integration_id?: string;
   crm_record_type?: string;
@@ -45,6 +45,9 @@ const KnowledgeBase = () => {
   const [scrapingUrl, setScrapingUrl] = useState(false);
   const [crmIntegrations, setCrmIntegrations] = useState<any[]>([]);
   const [syncingCrm, setSyncingCrm] = useState(false);
+  const [pasteTitle, setPasteTitle] = useState('');
+  const [pasteContent, setPasteContent] = useState('');
+  const [pastingText, setPastingText] = useState(false);
 
   useEffect(() => {
     if (clientId) {
@@ -262,14 +265,74 @@ const KnowledgeBase = () => {
     }
   };
 
+  const handleTextPaste = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pasteTitle.trim() || !pasteContent.trim() || !clientId) return;
+
+    setPastingText(true);
+    setUploadProgress(0);
+
+    try {
+      setUploadProgress(25);
+
+      // Generate a unique file path for the text content
+      const timestamp = Date.now();
+      const sanitizedTitle = pasteTitle.trim().replace(/[^a-zA-Z0-9\s-_]/g, '').replace(/\s+/g, '-');
+      const filePath = `${clientId}/text-${timestamp}-${sanitizedTitle}.txt`;
+
+      setUploadProgress(50);
+
+      // Save document metadata directly to database
+      const { error: dbError } = await supabase
+        .from('knowledge_base_documents')
+        .insert([{
+          client_id: clientId,
+          title: pasteTitle.trim(),
+          filename: `${sanitizedTitle}.txt`,
+          file_path: filePath,
+          file_size: new Blob([pasteContent]).size,
+          file_type: 'text/plain',
+          content: pasteContent.trim(),
+          source_type: 'text',
+          processed: true
+        }]);
+
+      if (dbError) throw dbError;
+
+      setUploadProgress(100);
+      
+      toast({
+        title: "Success",
+        description: "Text content added to knowledge base successfully",
+      });
+
+      setPasteTitle('');
+      setPasteContent('');
+      loadDocuments();
+      
+    } catch (error: any) {
+      console.error('Error saving text content:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save text content",
+        variant: "destructive",
+      });
+    } finally {
+      setPastingText(false);
+      setUploadProgress(0);
+    }
+  };
+
   const handleDeleteDocument = async (document: Document) => {
     try {
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('knowledge-base')
-        .remove([document.file_path]);
+      // Only try to delete from storage if it's not a text document
+      if (document.source_type !== 'text') {
+        const { error: storageError } = await supabase.storage
+          .from('knowledge-base')
+          .remove([document.file_path]);
 
-      if (storageError) throw storageError;
+        if (storageError) throw storageError;
+      }
 
       // Delete from database
       const { error: dbError } = await supabase
@@ -342,7 +405,7 @@ const KnowledgeBase = () => {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="files" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="files">
                     <Upload className="h-4 w-4 mr-2" />
                     Upload Files
@@ -350,6 +413,10 @@ const KnowledgeBase = () => {
                   <TabsTrigger value="urls">
                     <Globe className="h-4 w-4 mr-2" />
                     Scrape Websites
+                  </TabsTrigger>
+                  <TabsTrigger value="text">
+                    <Type className="h-4 w-4 mr-2" />
+                    Paste Text
                   </TabsTrigger>
                   <TabsTrigger value="crm">
                     <Database className="h-4 w-4 mr-2" />
@@ -414,6 +481,55 @@ const KnowledgeBase = () => {
                       <Progress value={uploadProgress} />
                       <p className="text-sm text-muted-foreground">
                         Scraping and processing website content...
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="text" className="space-y-4">
+                  <form onSubmit={handleTextPaste} className="space-y-4">
+                    <div>
+                      <Label htmlFor="paste-title">Title</Label>
+                      <Input
+                        id="paste-title"
+                        type="text"
+                        value={pasteTitle}
+                        onChange={(e) => setPasteTitle(e.target.value)}
+                        placeholder="Enter a title for your content"
+                        disabled={pastingText}
+                        className="mt-2"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="paste-content">Content</Label>
+                      <Textarea
+                        id="paste-content"
+                        value={pasteContent}
+                        onChange={(e) => setPasteContent(e.target.value)}
+                        placeholder="Paste your text, code, documentation, or any other content here..."
+                        disabled={pastingText}
+                        className="mt-2 min-h-[200px]"
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Paste any text content, code snippets, documentation, FAQs, or other information
+                      </p>
+                    </div>
+                    <Button 
+                      type="submit" 
+                      disabled={pastingText || !pasteTitle.trim() || !pasteContent.trim()}
+                      className="w-full sm:w-auto"
+                    >
+                      <Type className="h-4 w-4 mr-2" />
+                      {pastingText ? 'Adding...' : 'Add to Knowledge Base'}
+                    </Button>
+                  </form>
+                  {pastingText && (
+                    <div className="space-y-2">
+                      <Progress value={uploadProgress} />
+                      <p className="text-sm text-muted-foreground">
+                        Adding text content to knowledge base...
                       </p>
                     </div>
                   )}
@@ -511,6 +627,8 @@ const KnowledgeBase = () => {
                         <Globe className="h-8 w-8 text-muted-foreground" />
                       ) : document.source_type === 'crm' ? (
                         <Database className="h-8 w-8 text-muted-foreground" />
+                      ) : document.source_type === 'text' ? (
+                        <Type className="h-8 w-8 text-muted-foreground" />
                       ) : (
                         <FileText className="h-8 w-8 text-muted-foreground" />
                       )}
@@ -526,6 +644,12 @@ const KnowledgeBase = () => {
                             <>
                               <span>CRM: {document.crm_record_type}</span>
                               <Badge variant="secondary" className="text-xs">CRM Data</Badge>
+                            </>
+                          ) : document.source_type === 'text' ? (
+                            <>
+                              <span>Pasted content</span>
+                              <span>{formatFileSize(document.file_size)}</span>
+                              <Badge variant="secondary" className="text-xs">Text Content</Badge>
                             </>
                           ) : (
                             <>
