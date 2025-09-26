@@ -168,11 +168,18 @@ fastify.all('/incoming-call', async (request, reply) => {
   let twimlResponse;
   
   if (skipGreeting) {
-    // Skip greeting and connect directly
+    // Skip greeting and connect directly with enhanced audio
     console.log('Skipping greeting, connecting directly to stream');
+    const audioQuality = integration?.voice_settings?.audio_quality || 'enhanced';
+    const connectAttributes = audioQuality === 'premium' 
+      ? 'audioCodec="PCMU" enableOnHold="true"'
+      : audioQuality === 'enhanced'
+      ? 'audioCodec="PCMU" enableOnHold="true"'
+      : 'audioCodec="PCMU"';
+    
     twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                      <Response>
-                         <Connect>
+                         <Connect ${connectAttributes}>
                              <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" />
                          </Connect>
                      </Response>`;
@@ -183,12 +190,16 @@ fastify.all('/incoming-call', async (request, reply) => {
       
       console.log('Using greeting with enhanced audio:', { greetingMessage, greetingVoice, audioQuality });
       
-      // Enhanced TwiML with audio quality settings
-      const audioSettings = audioQuality === 'premium' 
-        ? 'audioCodec="PCMU" enableOnHold="true" statusCallback="https://webhook.example.com/status"'
+      // Separate Connect and Stream attributes according to TwiML spec
+      const connectAttributes = audioQuality === 'premium' 
+        ? 'audioCodec="PCMU" enableOnHold="true"'
         : audioQuality === 'enhanced'
         ? 'audioCodec="PCMU" enableOnHold="true"'
         : 'audioCodec="PCMU"';
+      
+      const streamAttributes = audioQuality === 'premium' 
+        ? 'statusCallback="https://webhook.example.com/status"'
+        : '';
       
       // Reduced delay for better user experience (was 1000ms)
       setTimeout(() => {
@@ -198,8 +209,8 @@ fastify.all('/incoming-call', async (request, reply) => {
       twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                        <Response>
                            <Say voice="${greetingVoice}" language="en-US">${greetingMessage}</Say>
-                           <Connect>
-                               <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" ${audioSettings} />
+                           <Connect ${connectAttributes}>
+                               <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}"${streamAttributes ? ' ' + streamAttributes : ''} />
                            </Connect>
                        </Response>`;
     } catch (error) {
@@ -208,7 +219,7 @@ fastify.all('/incoming-call', async (request, reply) => {
       twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                        <Response>
                            <Say voice="alice" language="en-US">Hello, connecting you now.</Say>
-                           <Connect>
+                           <Connect audioCodec="PCMU">
                                <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" />
                            </Connect>
                        </Response>`;
