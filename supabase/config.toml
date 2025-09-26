@@ -1,8 +1,5 @@
 project_id = "ycvvuepfsebqpwmamqgg"
 
-[functions.twilio-voice-handler]
-verify_jwt = false
-
 [functions.chat-with-agent]
 verify_jwt = false
 
