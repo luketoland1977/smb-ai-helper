@@ -222,14 +222,21 @@ fastify.register(async (fastify) => {
       openAiWs.send(JSON.stringify(sessionUpdate));
       
       // Send initial greeting after session is configured
-      setTimeout(() => {
-        sendInitialConversationItem();
+      setTimeout(async () => {
+        await sendInitialConversationItem();
       }, 1000);
     };
 
-    // Send initial conversation item so AI speaks first
-    const sendInitialConversationItem = () => {
+    // Send initial conversation item with knowledge base context
+    const sendInitialConversationItem = async () => {
       const clientName = clientInfo?.clients?.name || 'our company';
+      
+      // Load initial knowledge base context
+      if (clientInfo?.client_id) {
+        console.log('📚 Loading initial knowledge base context for client:', clientName);
+        await injectKnowledgeBaseContext('company information services products overview');
+      }
+      
       const greeting = `Hello! I'm your AI assistant for ${clientName}. How may I help you today?`;
       
       const initialConversationItem = {
@@ -251,13 +258,53 @@ fastify.register(async (fastify) => {
       openAiWs.send(JSON.stringify({ type: 'response.create' }));
     };
 
-    // Handle user audio input with knowledge base search
-    const handleUserAudio = async (audioData) => {
-      if (clientInfo?.client_id && audioData) {
-        // For now, we'll search knowledge base when audio is received
-        // In a production system, you'd want to transcribe audio first
-        console.log('Audio received for client:', clientInfo.client_id);
+    // Handle knowledge base search and injection
+    const injectKnowledgeBaseContext = async (query) => {
+      if (!clientInfo?.client_id) return;
+      
+      console.log('🔍 Searching knowledge base for query:', query);
+      const knowledgeContext = await searchKnowledgeBase(clientInfo.client_id, query);
+      
+      if (knowledgeContext) {
+        console.log('📚 Injecting knowledge base context into conversation');
+        const contextItem = {
+          type: 'conversation.item.create',
+          item: {
+            type: 'message',
+            role: 'system',
+            content: [
+              {
+                type: 'input_text',
+                text: `Relevant company information and context:\n\n${knowledgeContext}\n\nUse this information to provide accurate and helpful responses about our company, products, services, and policies.`
+              }
+            ]
+          }
+        };
+        
+        if (openAiWs.readyState === WebSocket.OPEN) {
+          openAiWs.send(JSON.stringify(contextItem));
+          console.log('✅ Knowledge base context injected successfully');
+        }
+      } else {
+        console.log('❌ No relevant knowledge base content found');
       }
+    };
+
+    // Handle user speech stopped event with knowledge search
+    const handleSpeechStoppedEvent = async () => {
+      console.log('🛑 User stopped speaking - searching knowledge base');
+      
+      // Search knowledge base with general queries that might be relevant
+      // In a production system, you'd transcribe the audio first to get the actual query
+      const commonQueries = [
+        'services products pricing',
+        'contact information support',
+        'company information about us',
+        'frequently asked questions FAQ'
+      ];
+      
+      // Use a general search query for now
+      await injectKnowledgeBaseContext(commonQueries.join(' '));
     };
 
     // Handle interruption when the caller's speech starts
@@ -353,6 +400,11 @@ fastify.register(async (fastify) => {
           handleSpeechStartedEvent();
         }
 
+        if (response.type === 'input_audio_buffer.speech_stopped') {
+          console.log('🛑 User stopped speaking - triggering knowledge base search');
+          await handleSpeechStoppedEvent();
+        }
+
         if (response.type === 'response.created') {
           console.log('🤖 OpenAI response started');
         }
@@ -385,9 +437,6 @@ fastify.register(async (fastify) => {
               };
               openAiWs.send(JSON.stringify(audioAppend));
               console.log(`📤 Sent audio to OpenAI, payload length: ${data.media.payload.length}`);
-              
-              // Handle potential knowledge base search
-              await handleUserAudio(data.media.payload);
             } else {
               console.log('⚠️ OpenAI WebSocket not ready, dropping audio');
             }
