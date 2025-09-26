@@ -3,18 +3,27 @@ import WebSocket from 'ws';
 import dotenv from 'dotenv';
 import fastifyFormBody from '@fastify/formbody';
 import fastifyWs from '@fastify/websocket';
+import { createClient } from '@supabase/supabase-js';
 
 // Load environment variables from .env file
 dotenv.config();
 
-// Retrieve the OpenAI API key from environment variables.
-const { OPENAI_API_KEY } = process.env;
+// Retrieve environment variables
+const { OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
 const PORT = process.env.PORT || 3001;
 
 if (!OPENAI_API_KEY) {
   console.error('Missing OpenAI API key. Please set it in the .env file.');
   process.exit(1);
 }
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('Missing Supabase credentials. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the .env file.');
+  process.exit(1);
+}
+
+// Initialize Supabase client
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Initialize Fastify
 const fastify = Fastify();
@@ -42,6 +51,70 @@ const LOG_EVENT_TYPES = [
 // Show AI response elapsed timing calculations
 const SHOW_TIMING_MATH = false;
 
+// Search knowledge base for relevant content
+async function searchKnowledgeBase(clientId, query) {
+  try {
+    console.log('Searching knowledge base for client:', clientId, 'query:', query);
+    
+    const { data: chunks, error } = await supabase
+      .from('knowledge_base_chunks')
+      .select('content, metadata')
+      .eq('client_id', clientId)
+      .textSearch('content', query.split(' ').join(' | '))
+      .limit(3);
+
+    if (error) {
+      console.error('Knowledge base search error:', error);
+      return null;
+    }
+
+    if (!chunks || chunks.length === 0) {
+      console.log('No relevant knowledge base content found');
+      return null;
+    }
+
+    const context = chunks
+      .map(chunk => chunk.content)
+      .join('\n\n---\n\n');
+
+    console.log('Found relevant knowledge base content:', chunks.length, 'chunks');
+    return context;
+  } catch (error) {
+    console.error('Error searching knowledge base:', error);
+    return null;
+  }
+}
+
+// Get client and agent info from phone number
+async function getClientAgentInfo(phoneNumber) {
+  try {
+    console.log('Looking up client/agent for phone number:', phoneNumber);
+    
+    const { data: integration, error } = await supabase
+      .from('twilio_integrations')
+      .select(`
+        client_id,
+        agent_id,
+        clients(name),
+        ai_agents(name, system_prompt)
+      `)
+      .eq('phone_number', phoneNumber)
+      .eq('is_active', true)
+      .single();
+
+    if (error) {
+      console.error('Error looking up integration:', error);
+      return null;
+    }
+
+    console.log('Found integration:', integration);
+    return integration;
+  } catch (error) {
+    console.error('Error getting client/agent info:', error);
+    return null;
+  }
+}
+
 // Root Route
 fastify.get('/', async (request, reply) => {
   reply.send({ message: 'Twilio Media Stream Server v4.0 - Session Fixed!', timestamp: new Date().toISOString() });
@@ -59,11 +132,16 @@ fastify.all('/incoming-call', async (request, reply) => {
   console.log('Headers:', request.headers);
   console.log('Body:', request.body);
   console.log('Host:', request.headers.host);
+  
+  // Get the To number (the Twilio number being called)
+  const toNumber = request.body?.To || request.query?.To;
+  console.log('Called Twilio number:', toNumber);
+  
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                         <Response>
-                            <Say voice="Google.en-US-Chirp3-HD-Aoede">Hello! I'm your AI assistant. How can I help you today?</Say>
+                            <Say voice="Google.en-US-Chirp3-HD-Aoede">Hello! I'm connecting you to your AI assistant.</Say>
                             <Connect>
-                                <Stream url="wss://${request.headers.host}/media-stream" />
+                                <Stream url="wss://${request.headers.host}/media-stream?phone=${encodeURIComponent(toNumber || '')}" />
                             </Connect>
                         </Response>`;
 
@@ -72,9 +150,27 @@ fastify.all('/incoming-call', async (request, reply) => {
 
 // WebSocket route for media-stream
 fastify.register(async (fastify) => {
-  fastify.get('/media-stream', { websocket: true }, (connection, req) => {
+  fastify.get('/media-stream', { websocket: true }, async (connection, req) => {
     console.log('=== MEDIA STREAM WEBSOCKET CONNECTED ===');
     console.log('Request headers:', req.headers);
+    console.log('Request URL:', req.url);
+
+    // Extract phone number from query parameters
+    const url = new URL(req.url, 'http://localhost');
+    const phoneNumber = url.searchParams.get('phone');
+    console.log('Phone number from query:', phoneNumber);
+
+    // Get client and agent info
+    let clientInfo = null;
+    let systemPrompt = SYSTEM_MESSAGE;
+    
+    if (phoneNumber) {
+      clientInfo = await getClientAgentInfo(phoneNumber);
+      if (clientInfo?.ai_agents?.system_prompt) {
+        systemPrompt = clientInfo.ai_agents.system_prompt;
+        console.log('Using client-specific system prompt for:', clientInfo.clients?.name);
+      }
+    }
 
     // Connection-specific state
     let streamSid = null;
@@ -98,7 +194,7 @@ fastify.register(async (fastify) => {
         type: 'session.update',
         session: {
           modalities: ['text', 'audio'],
-          instructions: 'pmpt_68c50f2852548197b42ccce02443ea1804c7524836544f5a',
+          instructions: systemPrompt,
           voice: 'alloy',
           input_audio_format: 'g711_ulaw',
           output_audio_format: 'g711_ulaw',
@@ -127,7 +223,8 @@ fastify.register(async (fastify) => {
 
     // Send initial conversation item so AI speaks first
     const sendInitialConversationItem = () => {
-      const greeting = 'Hello! How may I assist you today?';
+      const clientName = clientInfo?.clients?.name || 'our company';
+      const greeting = `Hello! I'm your AI assistant for ${clientName}. How may I help you today?`;
       
       const initialConversationItem = {
         type: 'conversation.item.create',
@@ -146,6 +243,15 @@ fastify.register(async (fastify) => {
       if (SHOW_TIMING_MATH) console.log('Sending initial conversation item:', JSON.stringify(initialConversationItem));
       openAiWs.send(JSON.stringify(initialConversationItem));
       openAiWs.send(JSON.stringify({ type: 'response.create' }));
+    };
+
+    // Handle user audio input with knowledge base search
+    const handleUserAudio = async (audioData) => {
+      if (clientInfo?.client_id && audioData) {
+        // For now, we'll search knowledge base when audio is received
+        // In a production system, you'd want to transcribe audio first
+        console.log('Audio received for client:', clientInfo.client_id);
+      }
     };
 
     // Handle interruption when the caller's speech starts
@@ -273,6 +379,9 @@ fastify.register(async (fastify) => {
               };
               openAiWs.send(JSON.stringify(audioAppend));
               console.log(`📤 Sent audio to OpenAI, payload length: ${data.media.payload.length}`);
+              
+              // Handle potential knowledge base search
+              await handleUserAudio(data.media.payload);
             } else {
               console.log('⚠️ OpenAI WebSocket not ready, dropping audio');
             }
