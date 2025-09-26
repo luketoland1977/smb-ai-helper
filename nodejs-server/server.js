@@ -244,9 +244,9 @@ fastify.register(async (fastify) => {
           },
           turn_detection: {
             type: 'server_vad',
-            threshold: 0.5,
-            prefix_padding_ms: 300,
-            silence_duration_ms: 1000
+            threshold: 0.65, // Reduced noise sensitivity 
+            prefix_padding_ms: 500, // Better speech capture
+            silence_duration_ms: 1800 // Allow more natural pauses
           },
           temperature: 0.8,
           max_response_output_tokens: 'inf'
@@ -256,20 +256,20 @@ fastify.register(async (fastify) => {
       console.log('📤 Sending session configuration with g711_ulaw format');
       openAiWs.send(JSON.stringify(sessionUpdate));
       
-      // Send initial greeting after session is configured
+      // Send initial greeting after session is configured - reduced delay
       setTimeout(async () => {
         await sendInitialConversationItem();
-      }, 1000);
+      }, 200);
     };
 
     // Send initial conversation item with knowledge base context
     const sendInitialConversationItem = async () => {
       const clientName = clientInfo?.clients?.name || 'our company';
       
-      // Load initial knowledge base context
+      // Load essential context only once at start - reduced latency
       if (clientInfo?.client_id) {
-        console.log('📚 Loading initial knowledge base context for client:', clientName);
-        await injectKnowledgeBaseContext('company information services products overview');
+        console.log('📚 Loading essential knowledge base context for client:', clientName);
+        await injectKnowledgeBaseContext('company overview contact information', true);
       }
       
       const greeting = `Hello! I'm your AI assistant for ${clientName}. How may I help you today?`;
@@ -293,14 +293,58 @@ fastify.register(async (fastify) => {
       openAiWs.send(JSON.stringify({ type: 'response.create' }));
     };
 
-    // Handle knowledge base search and injection
-    const injectKnowledgeBaseContext = async (query) => {
+    // Handle knowledge base search and injection with caching
+    let knowledgeCache = new Map();
+    let lastKnowledgeSearch = 0;
+    const KNOWLEDGE_SEARCH_COOLDOWN = 10000; // 10 seconds between searches
+    
+    const injectKnowledgeBaseContext = async (query, isInitial = false) => {
       if (!clientInfo?.client_id) return;
       
+      // Skip if recent search unless initial
+      const now = Date.now();
+      if (!isInitial && (now - lastKnowledgeSearch) < KNOWLEDGE_SEARCH_COOLDOWN) {
+        console.log('⏭️ Skipping knowledge base search - cooldown active');
+        return;
+      }
+      
+      // Check cache first
+      if (knowledgeCache.has(query)) {
+        console.log('💾 Using cached knowledge base result');
+        const cachedContext = knowledgeCache.get(query);
+        if (cachedContext) {
+          const contextItem = {
+            type: 'conversation.item.create',
+            item: {
+              type: 'message',
+              role: 'system', 
+              content: [
+                {
+                  type: 'input_text',
+                  text: `Relevant company information:\n\n${cachedContext}\n\nUse this information to provide accurate responses.`
+                }
+              ]
+            }
+          };
+          
+          if (openAiWs.readyState === WebSocket.OPEN) {
+            openAiWs.send(JSON.stringify(contextItem));
+          }
+        }
+        return;
+      }
+      
       console.log('🔍 Searching knowledge base for query:', query);
+      const startTime = Date.now();
       const knowledgeContext = await searchKnowledgeBase(clientInfo.client_id, query);
+      const searchTime = Date.now() - startTime;
+      console.log(`⏱️ Knowledge base search took ${searchTime}ms`);
       
       if (knowledgeContext) {
+        // Cache the result
+        knowledgeCache.set(query, knowledgeContext);
+        lastKnowledgeSearch = now;
+        
         console.log('📚 Injecting knowledge base context into conversation');
         const contextItem = {
           type: 'conversation.item.create',
@@ -310,7 +354,7 @@ fastify.register(async (fastify) => {
             content: [
               {
                 type: 'input_text',
-                text: `Relevant company information and context:\n\n${knowledgeContext}\n\nUse this information to provide accurate and helpful responses about our company, products, services, and policies.`
+                text: `Relevant company information:\n\n${knowledgeContext}\n\nUse this information to provide accurate responses.`
               }
             ]
           }
@@ -325,21 +369,21 @@ fastify.register(async (fastify) => {
       }
     };
 
-    // Handle user speech stopped event with knowledge search
+    // Handle user speech stopped event - reduced knowledge base calls for better performance
+    let speechStopCount = 0;
     const handleSpeechStoppedEvent = async () => {
-      console.log('🛑 User stopped speaking - searching knowledge base');
+      speechStopCount++;
+      console.log(`🛑 User stopped speaking (${speechStopCount}) - optimized knowledge base handling`);
       
-      // Search knowledge base with general queries that might be relevant
-      // In a production system, you'd transcribe the audio first to get the actual query
-      const commonQueries = [
-        'services products pricing',
-        'contact information support',
-        'company information about us',
-        'frequently asked questions FAQ'
-      ];
-      
-      // Use a general search query for now
-      await injectKnowledgeBaseContext(commonQueries.join(' '));
+      // Only search knowledge base on specific intervals to reduce latency
+      // First stop: essential info, then every 3rd stop for additional context
+      if (speechStopCount === 1) {
+        await injectKnowledgeBaseContext('frequently asked questions FAQ support');
+      } else if (speechStopCount % 3 === 0) {
+        await injectKnowledgeBaseContext('services products pricing features');
+      } else {
+        console.log('⏭️ Skipping knowledge base search for better response time');
+      }
     };
 
     // Handle interruption when the caller's speech starts
@@ -436,7 +480,7 @@ fastify.register(async (fastify) => {
         }
 
         if (response.type === 'input_audio_buffer.speech_stopped') {
-          console.log('🛑 User stopped speaking - triggering knowledge base search');
+          console.log('🛑 User stopped speaking - optimized handling');
           await handleSpeechStoppedEvent();
         }
 
