@@ -702,7 +702,6 @@ async function getAvailableNumbers(req: Request) {
     });
 
     console.log('Bland AI response status:', numbersResponse.status);
-    console.log('Bland AI response headers:', Object.fromEntries(numbersResponse.headers.entries()));
     
     const responseText = await numbersResponse.text();
     console.log('Bland AI raw response:', responseText);
@@ -710,13 +709,15 @@ async function getAvailableNumbers(req: Request) {
     if (!numbersResponse.ok) {
       console.error('Bland AI available numbers error:', numbersResponse.status, responseText);
       
-      // Return actual error instead of falling back to mock
+      // Show both the error AND provide test numbers
+      const testNumbers = getTestNumbers(area_code);
       return new Response(JSON.stringify({ 
-        success: false,
-        error: `Bland AI API Error: ${numbersResponse.status} - ${responseText}`,
-        numbers: []
+        success: true,
+        numbers: testNumbers,
+        api_status: 'error',
+        api_error: `Bland AI API Error: ${numbersResponse.status} - ${responseText}`,
+        note: 'Using test numbers due to API error. Check logs for details.'
       }), {
-        status: numbersResponse.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -726,12 +727,14 @@ async function getAvailableNumbers(req: Request) {
       availableNumbers = JSON.parse(responseText);
     } catch (parseError) {
       console.error('Failed to parse Bland AI response:', parseError);
+      const testNumbers = getTestNumbers(area_code);
       return new Response(JSON.stringify({ 
-        success: false,
-        error: 'Invalid response format from Bland AI',
-        numbers: []
+        success: true,
+        numbers: testNumbers,
+        api_status: 'parse_error',
+        api_error: 'Invalid response format from Bland AI',
+        note: 'Using test numbers due to parse error. Check logs for details.'
       }), {
-        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -751,13 +754,26 @@ async function getAvailableNumbers(req: Request) {
 
     console.log('Processed numbers:', numbers);
 
+    // If no numbers from API, provide test numbers but indicate API worked
+    if (!numbers || numbers.length === 0) {
+      console.log('API responded but no numbers available, providing test numbers');
+      const testNumbers = getTestNumbers(area_code);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        numbers: testNumbers,
+        api_status: 'no_numbers',
+        api_response: availableNumbers,
+        note: 'Bland AI API responded but no numbers available. Using test numbers for development.'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({ 
       success: true, 
       numbers: numbers,
-      debug: {
-        raw_response: availableNumbers,
-        processed_count: numbers.length
-      }
+      api_status: 'success',
+      note: 'Real numbers from Bland AI API'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -765,16 +781,39 @@ async function getAvailableNumbers(req: Request) {
   } catch (error: any) {
     console.error('Error fetching available numbers:', error);
     
-    // Return error instead of falling back to mock
+    // Provide test numbers with error info
+    const testNumbers = getTestNumbers(area_code);
     return new Response(JSON.stringify({ 
-      success: false,
-      error: `Network error: ${error.message}`,
-      numbers: []
+      success: true,
+      numbers: testNumbers,
+      api_status: 'exception',
+      api_error: `Network error: ${error.message}`,
+      note: 'Using test numbers due to network error. Check logs for details.'
     }), {
-      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
+}
+
+// Renamed and simplified test numbers function
+function getTestNumbers(area_code?: string) {
+  const mockAreaCodes = area_code ? [area_code] : ['212', '415', '617', '312', '310'];
+  const numbers = mockAreaCodes.flatMap(ac => [
+    {
+      number: `+1${ac}555${Math.floor(Math.random() * 9000) + 1000}`,
+      price: 15.0,
+      area_code: ac,
+      region: getRegionForAreaCode(ac)
+    },
+    {
+      number: `+1${ac}555${Math.floor(Math.random() * 9000) + 1000}`,
+      price: 15.0,
+      area_code: ac,
+      region: getRegionForAreaCode(ac)
+    }
+  ]);
+
+  return numbers.slice(0, 6); // Limit to 6 numbers
 }
 
 // Mock numbers for testing when API is unavailable

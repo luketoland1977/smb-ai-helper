@@ -62,15 +62,40 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
 
       if (data?.success && data?.numbers) {
         setAvailableNumbers(data.numbers);
+        
+        // Show diagnostic information
+        let toastMessage = `Found ${data.numbers.length} available numbers`;
+        let toastType: "default" | "destructive" = "default";
+        
+        if (data.api_status === 'success') {
+          toastMessage += ' (Real numbers from Bland AI)';
+        } else if (data.api_status === 'no_numbers') {
+          toastMessage += ' (Test numbers - Bland AI has no available numbers)';
+        } else if (data.api_status === 'error') {
+          toastMessage += ' (Test numbers - Bland AI API error)';
+          toastType = "destructive";
+        } else {
+          toastMessage += ' (Test numbers for development)';
+        }
+        
         toast({
-          title: "Numbers Refreshed",
-          description: `Found ${data.numbers.length} available numbers`,
+          title: "Numbers Loaded",
+          description: toastMessage,
+          variant: toastType,
         });
+        
+        // Log diagnostic info for debugging
+        if (data.note) {
+          console.log('Bland AI Status:', data.note);
+        }
+        if (data.api_error) {
+          console.error('Bland AI Error:', data.api_error);
+        }
       } else {
         setAvailableNumbers([]);
         toast({
           title: "No Numbers Available",
-          description: "No phone numbers currently available",
+          description: "Unable to load any phone numbers",
           variant: "destructive",
         });
       }
