@@ -63,7 +63,7 @@ serve(async (req) => {
     // Format results
     const results = chunks.map(chunk => ({
       content: chunk.content,
-      source: chunk.knowledge_base_documents?.title || chunk.knowledge_base_documents?.filename || 'Unknown',
+      source: chunk.knowledge_base_documents?.[0]?.title || chunk.knowledge_base_documents?.[0]?.filename || 'Unknown',
       chunkIndex: chunk.chunk_index
     }));
 
