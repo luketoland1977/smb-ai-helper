@@ -45,6 +45,56 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
     }
   }, [agents, formData.agent_id]);
 
+  // Load available numbers on component mount
+  React.useEffect(() => {
+    loadAvailableNumbers();
+  }, []);
+
+  const loadAvailableNumbers = async (filterAreaCode?: string) => {
+    setLoadingNumbers(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('bland-integration', {
+        body: {
+          action: 'search-numbers',
+          ...(filterAreaCode && { area_code: filterAreaCode }),
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data?.numbers) {
+        setAvailableNumbers(data.numbers);
+        if (filterAreaCode) {
+          toast({
+            title: "Numbers Filtered",
+            description: `Found ${data.numbers.length} numbers in area code ${filterAreaCode}`,
+          });
+        }
+      } else {
+        setAvailableNumbers([]);
+        if (filterAreaCode) {
+          toast({
+            title: "No Numbers Available",
+            description: `No phone numbers available in area code ${filterAreaCode}`,
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading numbers:', error);
+      if (filterAreaCode) {
+        toast({
+          title: "Error",
+          description: "Failed to search for available numbers. Please try again.",
+          variant: "destructive",
+        });
+      }
+      setAvailableNumbers([]);
+    } finally {
+      setLoadingNumbers(false);
+    }
+  };
+
   const searchAvailableNumbers = async () => {
     if (!areaCode || areaCode.length !== 3) {
       toast({
@@ -54,43 +104,12 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
       });
       return;
     }
+    loadAvailableNumbers(areaCode);
+  };
 
-    setLoadingNumbers(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('bland-integration', {
-        body: {
-          action: 'search-numbers',
-          area_code: areaCode,
-        }
-      });
-
-      if (error) throw error;
-
-      if (data?.success && data?.numbers) {
-        setAvailableNumbers(data.numbers);
-        toast({
-          title: "Numbers Found",
-          description: `Found ${data.numbers.length} available numbers in area code ${areaCode}`,
-        });
-      } else {
-        setAvailableNumbers([]);
-        toast({
-          title: "No Numbers Available",
-          description: `No phone numbers available in area code ${areaCode}`,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error searching numbers:', error);
-      toast({
-        title: "Error",
-        description: "Failed to search for available numbers. Please try again.",
-        variant: "destructive",
-      });
-      setAvailableNumbers([]);
-    } finally {
-      setLoadingNumbers(false);
-    }
+  const clearFilter = () => {
+    setAreaCode("");
+    loadAvailableNumbers();
   };
 
   const purchaseNumber = async (number: string, price: number) => {
@@ -211,8 +230,9 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
             
             {!formData.phone_number ? (
               <>
+                {/* Optional Area Code Filter */}
                 <div className="space-y-2">
-                  <Label htmlFor="area_code">Search by Area Code</Label>
+                  <Label htmlFor="area_code">Filter by Area Code (Optional)</Label>
                   <div className="flex gap-2">
                     <Input
                       id="area_code"
@@ -228,28 +248,47 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
                       onClick={searchAvailableNumbers}
                       disabled={loadingNumbers || !areaCode || areaCode.length !== 3}
                       variant="outline"
+                      size="sm"
                     >
                       {loadingNumbers ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <RefreshCw className="h-4 w-4" />
                       )}
-                      Search Numbers
+                      Filter
                     </Button>
+                    {areaCode && (
+                      <Button 
+                        type="button" 
+                        onClick={clearFilter}
+                        disabled={loadingNumbers}
+                        variant="ghost"
+                        size="sm"
+                      >
+                        Clear Filter
+                      </Button>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Enter a 3-digit area code to search for available phone numbers
-                  </p>
                 </div>
 
-                {availableNumbers.length > 0 && (
-                  <div className="space-y-2">
+                {/* Available Numbers Display */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
                     <Label>Available Numbers</Label>
-                    <div className="max-h-48 overflow-y-auto space-y-2">
+                    {loadingNumbers && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Loading numbers...
+                      </div>
+                    )}
+                  </div>
+                  
+                  {availableNumbers.length > 0 ? (
+                    <div className="max-h-64 overflow-y-auto space-y-2">
                       {availableNumbers.map((num, index) => (
                         <div 
                           key={index}
-                          className="flex items-center justify-between p-3 border rounded-lg bg-background"
+                          className="flex items-center justify-between p-3 border rounded-lg bg-background hover:bg-muted/50 transition-colors"
                         >
                           <div className="flex-1">
                             <div className="font-mono font-medium">{num.number}</div>
@@ -276,8 +315,16 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : !loadingNumbers ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Phone className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No available numbers found</p>
+                      {areaCode && (
+                        <p className="text-sm">Try a different area code or clear the filter</p>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               </>
             ) : (
               <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50 border-green-200">
