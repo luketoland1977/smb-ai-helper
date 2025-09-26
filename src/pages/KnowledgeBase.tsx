@@ -6,10 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Upload, FileText, Trash2, Download, Link, Globe } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Trash2, Download, Link, Globe, Settings, Database } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 
 interface Document {
   id: string;
@@ -20,8 +21,10 @@ interface Document {
   file_path: string;
   processed: boolean;
   created_at: string;
-  source_type: 'file' | 'url';
+  source_type: 'file' | 'url' | 'crm';
   source_url: string | null;
+  crm_integration_id?: string;
+  crm_record_type?: string;
 }
 
 interface Client {
@@ -40,11 +43,14 @@ const KnowledgeBase = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [webUrl, setWebUrl] = useState('');
   const [scrapingUrl, setScrapingUrl] = useState(false);
+  const [crmIntegrations, setCrmIntegrations] = useState<any[]>([]);
+  const [syncingCrm, setSyncingCrm] = useState(false);
 
   useEffect(() => {
     if (clientId) {
       loadClient();
       loadDocuments();
+      loadCrmIntegrations();
     }
   }, [clientId]);
 
@@ -90,6 +96,55 @@ const KnowledgeBase = () => {
       setDocuments((data as Document[]) || []);
     }
     setLoading(false);
+  };
+
+  const loadCrmIntegrations = async () => {
+    if (!clientId) return;
+
+    const { data, error } = await supabase
+      .from('crm_integrations')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error loading CRM integrations:', error);
+    } else {
+      setCrmIntegrations(data || []);
+    }
+  };
+
+  const handleSyncCrm = async (integrationId: string) => {
+    if (!clientId) return;
+
+    setSyncingCrm(true);
+    try {
+      const { error } = await supabase.functions
+        .invoke('sync-crm-data', {
+          body: { 
+            integration_id: integrationId,
+            client_id: clientId
+          }
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "CRM data sync started successfully",
+      });
+
+      loadDocuments();
+    } catch (error: any) {
+      console.error('Error syncing CRM data:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to sync CRM data",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingCrm(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,7 +342,7 @@ const KnowledgeBase = () => {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="files" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="files">
                     <Upload className="h-4 w-4 mr-2" />
                     Upload Files
@@ -295,6 +350,10 @@ const KnowledgeBase = () => {
                   <TabsTrigger value="urls">
                     <Globe className="h-4 w-4 mr-2" />
                     Scrape Websites
+                  </TabsTrigger>
+                  <TabsTrigger value="crm">
+                    <Database className="h-4 w-4 mr-2" />
+                    CRM Data
                   </TabsTrigger>
                 </TabsList>
                 
@@ -359,6 +418,71 @@ const KnowledgeBase = () => {
                     </div>
                   )}
                 </TabsContent>
+
+                <TabsContent value="crm" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-lg font-medium">CRM Integrations</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Sync data from your connected CRM systems
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate(`/clients/${clientId}/crm-integrations`)}
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Manage CRM
+                    </Button>
+                  </div>
+
+                  {crmIntegrations.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border border-dashed border-border rounded-lg">
+                      <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="font-medium">No CRM integrations configured</p>
+                      <p className="text-sm">Connect your CRM to sync customer data, deals, and support tickets</p>
+                      <Button
+                        variant="outline"
+                        className="mt-4"
+                        onClick={() => navigate(`/clients/${clientId}/crm-integrations`)}
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Set up CRM Integration
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {crmIntegrations.map((integration: any) => (
+                        <div key={integration.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                          <div className="flex items-center space-x-4">
+                            <Database className="h-8 w-8 text-muted-foreground" />
+                            <div>
+                              <h4 className="font-medium">{integration.name}</h4>
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                                <Badge variant="outline">{integration.crm_type.toUpperCase()}</Badge>
+                                <span>•</span>
+                                <span>Status: {integration.sync_status}</span>
+                                {integration.last_sync_at && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Last sync: {new Date(integration.last_sync_at).toLocaleString()}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            onClick={() => handleSyncCrm(integration.id)}
+                            disabled={syncingCrm}
+                            size="sm"
+                          >
+                            {syncingCrm ? 'Syncing...' : 'Sync Now'}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
@@ -385,6 +509,8 @@ const KnowledgeBase = () => {
                     <div className="flex items-center space-x-4">
                       {document.source_type === 'url' ? (
                         <Globe className="h-8 w-8 text-muted-foreground" />
+                      ) : document.source_type === 'crm' ? (
+                        <Database className="h-8 w-8 text-muted-foreground" />
                       ) : (
                         <FileText className="h-8 w-8 text-muted-foreground" />
                       )}
@@ -395,6 +521,11 @@ const KnowledgeBase = () => {
                             <>
                               <span>Website: {document.source_url}</span>
                               <span>Scraped content</span>
+                            </>
+                          ) : document.source_type === 'crm' ? (
+                            <>
+                              <span>CRM: {document.crm_record_type}</span>
+                              <Badge variant="secondary" className="text-xs">CRM Data</Badge>
                             </>
                           ) : (
                             <>

@@ -13,6 +13,7 @@ import ClientForm from "./pages/ClientForm";
 import AgentForm from "./pages/AgentForm";
 import Chat from "./pages/Chat";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import CrmIntegrations from "./pages/CrmIntegrations";
 import ChatWidgetManager from "./pages/ChatWidgetManager";
 import RoleRequests from "./pages/RoleRequests";
 import NotFound from "./pages/NotFound";
@@ -70,6 +71,14 @@ const App = () => (
               element={
                 <ProtectedRoute roles={['admin', 'salesperson', 'support']}>
                   <KnowledgeBase />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/clients/:clientId/crm-integrations" 
+              element={
+                <ProtectedRoute roles={['admin', 'salesperson', 'support']}>
+                  <CrmIntegrations />
                 </ProtectedRoute>
               } 
             />

@@ -51,33 +51,45 @@ const LOG_EVENT_TYPES = [
 // Show AI response elapsed timing calculations
 const SHOW_TIMING_MATH = false;
 
-// Search knowledge base for relevant content
+// Search knowledge base for relevant content (including CRM data)
 async function searchKnowledgeBase(clientId, query) {
   try {
     console.log('Searching knowledge base for client:', clientId, 'query:', query);
     
-    const { data: chunks, error } = await supabase
-      .from('knowledge_base_chunks')
-      .select('content, metadata')
+    // Search both chunks and documents for comprehensive results
+    const { data: documents, error } = await supabase
+      .from('knowledge_base_documents')
+      .select('title, content, source_type, crm_record_type')
       .eq('client_id', clientId)
+      .eq('processed', true)
       .textSearch('content', query.split(' ').join(' | '))
-      .limit(3);
+      .limit(5);
 
     if (error) {
-      console.error('Knowledge base search error:', error);
+      console.error('Error searching knowledge base:', error);
       return null;
     }
 
-    if (!chunks || chunks.length === 0) {
-      console.log('No relevant knowledge base content found');
-      return null;
+    if (documents && documents.length > 0) {
+      const context = documents.map(doc => {
+        let prefix = '';
+        if (doc.source_type === 'crm') {
+          prefix = `[CRM ${doc.crm_record_type?.toUpperCase() || 'RECORD'}] `;
+        }
+        return `${prefix}${doc.title}: ${doc.content}`;
+      }).join('\n\n---\n\n');
+
+      console.log('Found relevant knowledge base content:', documents.length, 'documents');
+      return context;
     }
 
-    const context = chunks
-      .map(chunk => chunk.content)
-      .join('\n\n---\n\n');
-
-    console.log('Found relevant knowledge base content:', chunks.length, 'chunks');
+    console.log('No relevant knowledge base content found');
+    return null;
+  } catch (error) {
+    console.error('Error in searchKnowledgeBase:', error);
+    return null;
+  }
+}
     return context;
   } catch (error) {
     console.error('Error searching knowledge base:', error);

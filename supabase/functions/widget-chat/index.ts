@@ -129,7 +129,7 @@ Please use this information to provide accurate, helpful responses. If the knowl
   } catch (error) {
     console.error('Error in widget-chat function:', error);
     return new Response(JSON.stringify({ 
-      error: error.message || 'Internal server error',
+      error: error instanceof Error ? error.message : 'Internal server error',
       response: 'I apologize, but I\'m experiencing technical difficulties. Please try again in a moment.'
     }), {
       status: 500,

@@ -149,7 +149,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in scrape-website function:', error);
     return new Response(JSON.stringify({
-      error: error.message || 'Failed to scrape website'
+      error: error instanceof Error ? error.message : 'Failed to scrape website'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
