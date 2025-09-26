@@ -682,6 +682,7 @@ async function getAvailableNumbers(req: Request) {
   const { area_code, country_code = 'US' } = await req.json();
 
   console.log('Getting available numbers:', { country_code, area_code });
+  console.log('Bland API Key available:', !!blandApiKey);
 
   try {
     // Try to get available numbers from Bland AI
@@ -693,6 +694,7 @@ async function getAvailableNumbers(req: Request) {
     console.log('Fetching from URL:', numbersUrl);
 
     const numbersResponse = await fetch(numbersUrl, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${blandApiKey}`,
         'Content-Type': 'application/json',
@@ -700,36 +702,62 @@ async function getAvailableNumbers(req: Request) {
     });
 
     console.log('Bland AI response status:', numbersResponse.status);
+    console.log('Bland AI response headers:', Object.fromEntries(numbersResponse.headers.entries()));
+    
+    const responseText = await numbersResponse.text();
+    console.log('Bland AI raw response:', responseText);
     
     if (!numbersResponse.ok) {
-      const errorText = await numbersResponse.text();
-      console.error('Bland AI available numbers error:', numbersResponse.status, errorText);
+      console.error('Bland AI available numbers error:', numbersResponse.status, responseText);
       
-      // If API fails, provide mock numbers for testing
-      console.log('Falling back to mock numbers due to API error');
-      return getMockNumbers(area_code);
+      // Return actual error instead of falling back to mock
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: `Bland AI API Error: ${numbersResponse.status} - ${responseText}`,
+        numbers: []
+      }), {
+        status: numbersResponse.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const availableNumbers = await numbersResponse.json();
-    console.log('Available numbers from Bland AI:', JSON.stringify(availableNumbers, null, 2));
+    let availableNumbers;
+    try {
+      availableNumbers = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse Bland AI response:', parseError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Invalid response format from Bland AI',
+        numbers: []
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Parsed available numbers from Bland AI:', JSON.stringify(availableNumbers, null, 2));
 
     // Check if we got actual numbers
-    const numbers = (availableNumbers.numbers || availableNumbers.data || []).map((num: any) => ({
+    const rawNumbers = availableNumbers.numbers || availableNumbers.data || availableNumbers.available_numbers || [];
+    console.log('Raw numbers array:', rawNumbers);
+
+    const numbers = rawNumbers.map((num: any) => ({
       number: num.phone_number || num.number || num.phoneNumber,
-      price: num.monthly_cost || num.price || num.cost || 15.0, // Updated default to match Bland AI pricing
+      price: num.monthly_cost || num.price || num.cost || 15.0,
       area_code: num.area_code || num.areaCode || (num.phone_number || num.number || '').substring(2, 5),
       region: num.region || num.location || num.city || 'Unknown'
     }));
 
-    // If no numbers returned, provide mock numbers
-    if (!numbers || numbers.length === 0) {
-      console.log('No numbers returned from API, using mock numbers');
-      return getMockNumbers(area_code);
-    }
+    console.log('Processed numbers:', numbers);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      numbers: numbers
+      numbers: numbers,
+      debug: {
+        raw_response: availableNumbers,
+        processed_count: numbers.length
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -737,9 +765,15 @@ async function getAvailableNumbers(req: Request) {
   } catch (error: any) {
     console.error('Error fetching available numbers:', error);
     
-    // Fallback to mock numbers
-    console.log('Exception occurred, falling back to mock numbers');
-    return getMockNumbers(area_code);
+    // Return error instead of falling back to mock
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: `Network error: ${error.message}`,
+      numbers: []
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 }
 
