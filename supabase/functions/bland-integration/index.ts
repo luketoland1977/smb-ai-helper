@@ -716,7 +716,7 @@ async function getAvailableNumbers(req: Request) {
     // Check if we got actual numbers
     const numbers = (availableNumbers.numbers || availableNumbers.data || []).map((num: any) => ({
       number: num.phone_number || num.number || num.phoneNumber,
-      price: num.monthly_cost || num.price || num.cost || 5.0,
+      price: num.monthly_cost || num.price || num.cost || 15.0, // Updated default to match Bland AI pricing
       area_code: num.area_code || num.areaCode || (num.phone_number || num.number || '').substring(2, 5),
       region: num.region || num.location || num.city || 'Unknown'
     }));
@@ -749,13 +749,13 @@ function getMockNumbers(area_code?: string) {
   const numbers = mockAreaCodes.flatMap(ac => [
     {
       number: `+1${ac}555${Math.floor(Math.random() * 9000) + 1000}`,
-      price: 5.0,
+      price: 15.0, // Updated to match Bland AI's actual pricing
       area_code: ac,
       region: getRegionForAreaCode(ac)
     },
     {
       number: `+1${ac}555${Math.floor(Math.random() * 9000) + 1000}`,
-      price: 5.0,
+      price: 15.0, // Updated to match Bland AI's actual pricing
       area_code: ac,
       region: getRegionForAreaCode(ac)
     }
