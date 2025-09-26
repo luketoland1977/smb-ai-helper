@@ -18,5 +18,5 @@ verify_jwt = false
 [functions.voice-widget]
 verify_jwt = false
 
-[functions.twilio-voice-integration]
+[functions.twilio-voice-webhook]
 verify_jwt = false
