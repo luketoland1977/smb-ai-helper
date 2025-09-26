@@ -976,11 +976,10 @@ const ChatWidgetManager = () => {
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <h4 className="font-medium text-blue-900">Voice Powered by ElevenLabs</h4>
+                          <h4 className="font-medium text-blue-900">AI Voice Calls</h4>
                         </div>
                         <p className="text-sm text-blue-800">
-                          Voice calls now use ElevenLabs AI with the high-quality "Aria" voice for natural, professional conversations. 
-                          The Twilio voice settings have been replaced with ElevenLabs for superior audio quality.
+                          Voice calls use AI-powered conversation with natural, professional voice interactions.
                         </p>
                       </div>
                       <div>
@@ -1101,14 +1100,14 @@ const ChatWidgetManager = () => {
                         <CardContent>
                           <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4 text-sm">
-                               <div>
-                                 <p><strong>SMS:</strong> {integration.sms_enabled ? 'Enabled' : 'Disabled'}</p>
-                                 <p><strong>Voice:</strong> {integration.voice_enabled ? 'Enabled (ElevenLabs Aria)' : 'Disabled'}</p>
-                               </div>
-                               <div>
-                                 <p><strong>Voice AI:</strong> ElevenLabs Aria</p>
-                                 <p><strong>Language:</strong> {integration.voice_settings?.language || 'en-US'}</p>
-                               </div>
+                                <div>
+                                  <p><strong>SMS:</strong> {integration.sms_enabled ? 'Enabled' : 'Disabled'}</p>
+                                  <p><strong>Voice:</strong> {integration.voice_enabled ? 'Enabled' : 'Disabled'}</p>
+                                </div>
+                                <div>
+                                  <p><strong>Voice AI:</strong> AI Voice</p>
+                                  <p><strong>Language:</strong> {integration.voice_settings?.language || 'en-US'}</p>
+                                </div>
                             </div>
                             
                             <div>
