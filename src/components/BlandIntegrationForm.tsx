@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Phone, Bot } from "lucide-react";
+import { Loader2, Phone, Bot, ShoppingCart, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface BlandIntegrationFormProps {
   clientId: string;
@@ -15,8 +16,19 @@ interface BlandIntegrationFormProps {
   onSuccess: () => void;
 }
 
+interface AvailableNumber {
+  number: string;
+  price: number;
+  area_code: string;
+  region: string;
+}
+
 export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandIntegrationFormProps) => {
   const [loading, setLoading] = useState(false);
+  const [purchasingNumber, setPurchasingNumber] = useState(false);
+  const [loadingNumbers, setLoadingNumbers] = useState(false);
+  const [availableNumbers, setAvailableNumbers] = useState<AvailableNumber[]>([]);
+  const [areaCode, setAreaCode] = useState("");
   const [formData, setFormData] = useState({
     agent_id: "",
     phone_number: "",
@@ -32,6 +44,88 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
       setFormData(prev => ({ ...prev, agent_id: agents[0].id }));
     }
   }, [agents, formData.agent_id]);
+
+  const searchAvailableNumbers = async () => {
+    if (!areaCode || areaCode.length !== 3) {
+      toast({
+        title: "Invalid Area Code",
+        description: "Please enter a valid 3-digit area code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoadingNumbers(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('bland-integration', {
+        body: {
+          action: 'search-numbers',
+          area_code: areaCode,
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data?.numbers) {
+        setAvailableNumbers(data.numbers);
+        toast({
+          title: "Numbers Found",
+          description: `Found ${data.numbers.length} available numbers in area code ${areaCode}`,
+        });
+      } else {
+        setAvailableNumbers([]);
+        toast({
+          title: "No Numbers Available",
+          description: `No phone numbers available in area code ${areaCode}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error searching numbers:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search for available numbers. Please try again.",
+        variant: "destructive",
+      });
+      setAvailableNumbers([]);
+    } finally {
+      setLoadingNumbers(false);
+    }
+  };
+
+  const purchaseNumber = async (number: string, price: number) => {
+    setPurchasingNumber(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('bland-integration', {
+        body: {
+          action: 'purchase-number',
+          phone_number: number,
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        setFormData(prev => ({ ...prev, phone_number: number }));
+        setAvailableNumbers([]);
+        toast({
+          title: "Number Purchased",
+          description: `Successfully purchased ${number} for $${price}`,
+        });
+      } else {
+        throw new Error(data?.error || "Failed to purchase number");
+      }
+    } catch (error) {
+      console.error('Error purchasing number:', error);
+      toast({
+        title: "Purchase Failed",
+        description: error.message || "Failed to purchase phone number. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setPurchasingNumber(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,16 +202,92 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone_number">Phone Number</Label>
-            <Input
-              id="phone_number"
-              type="tel"
-              placeholder="+1234567890"
-              value={formData.phone_number}
-              onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
-              required
-            />
+          {/* Phone Number Purchase Section */}
+          <div className="space-y-4 border rounded-lg p-4 bg-muted/50">
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              <Label className="text-base font-semibold">Phone Number</Label>
+            </div>
+            
+            {!formData.phone_number ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="area_code">Search by Area Code</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="area_code"
+                      type="text"
+                      placeholder="212"
+                      maxLength={3}
+                      value={areaCode}
+                      onChange={(e) => setAreaCode(e.target.value.replace(/\D/g, ''))}
+                      className="w-24"
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={searchAvailableNumbers}
+                      disabled={loadingNumbers || !areaCode || areaCode.length !== 3}
+                      variant="outline"
+                    >
+                      {loadingNumbers ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      Search Numbers
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enter a 3-digit area code to search for available phone numbers
+                  </p>
+                </div>
+
+                {availableNumbers.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Available Numbers</Label>
+                    <div className="max-h-48 overflow-y-auto space-y-2">
+                      {availableNumbers.map((num, index) => (
+                        <div 
+                          key={index}
+                          className="flex items-center justify-between p-3 border rounded-lg bg-background"
+                        >
+                          <div className="flex-1">
+                            <div className="font-mono font-medium">{num.number}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {num.region} • Area Code {num.area_code}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">${num.price}/month</Badge>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => purchaseNumber(num.number, num.price)}
+                              disabled={purchasingNumber}
+                            >
+                              {purchasingNumber ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <ShoppingCart className="h-3 w-3" />
+                              )}
+                              Purchase
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50 border-green-200">
+                <div>
+                  <div className="font-mono font-medium text-green-800">{formData.phone_number}</div>
+                  <div className="text-sm text-green-600">Purchased number ready for integration</div>
+                </div>
+                <Badge className="bg-green-100 text-green-800">Selected</Badge>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -178,11 +348,21 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
             </div>
           </div>
 
-          <Button type="submit" disabled={loading} className="w-full">
+          <Button 
+            type="submit" 
+            disabled={loading || !formData.phone_number} 
+            className="w-full"
+          >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <Phone className="mr-2 h-4 w-4" />
             Create Bland AI Integration
           </Button>
+          
+          {!formData.phone_number && (
+            <p className="text-xs text-muted-foreground text-center">
+              Please purchase a phone number before creating the integration
+            </p>
+          )}
         </form>
       </CardContent>
     </Card>
