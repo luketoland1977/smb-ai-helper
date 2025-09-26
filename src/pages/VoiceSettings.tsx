@@ -94,11 +94,32 @@ const VoiceSettings = () => {
 
       setAgents(agentsData || []);
       
-      // Debug: Log the loaded data
-      console.log('User roles:', rolesData);
-      console.log('Is admin:', isAdmin);
+      // Auto-select the first client that has agents (prioritize "Demo" client)
+      if (clientsData && clientsData.length > 0 && !selectedClient) {
+        // First try to find "Demo" client
+        const demoClient = clientsData.find(c => c.name?.toLowerCase().includes('demo'));
+        
+        if (demoClient) {
+          const demoClientAgents = agentsData?.filter(a => a.client_id === demoClient.id) || [];
+          if (demoClientAgents.length > 0) {
+            setSelectedClientId(demoClient.id);
+            return;
+          }
+        }
+        
+        // Otherwise, select the first client that has agents
+        for (const client of clientsData) {
+          const clientAgents = agentsData?.filter(a => a.client_id === client.id) || [];
+          if (clientAgents.length > 0) {
+            setSelectedClientId(client.id);
+            break;
+          }
+        }
+      }
+      
       console.log('Loaded clients:', clientsData);
       console.log('Loaded agents:', agentsData);
+      console.log('Auto-selected client:', selectedClient);
 
       // Set default client if available
       if (clientsData && clientsData.length > 0) {
@@ -186,6 +207,7 @@ const VoiceSettings = () => {
                 onChange={(e) => setSelectedClientId(e.target.value)}
                 className="w-full max-w-md px-3 py-2 border border-border rounded-md bg-background"
               >
+                <option value="">Select a client...</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
                     {client.name}
@@ -194,7 +216,14 @@ const VoiceSettings = () => {
               </select>
             </div>
 
-            {selectedClient && (
+            {!selectedClientId ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-2">Select a client to manage Bland AI integrations</p>
+                {clients.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No clients available. Create a client first to set up voice integrations.</p>
+                )}
+              </div>
+            ) : (
               <Tabs defaultValue="bland-ai" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-8">
                   <TabsTrigger value="bland-ai" className="flex items-center gap-2">
@@ -234,7 +263,8 @@ const VoiceSettings = () => {
                                 <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                                 <h4 className="text-lg font-semibold mb-2">No AI Agents</h4>
                                 <p className="text-muted-foreground mb-4">
-                                  Create an AI agent for {selectedClient.name} first.
+                                  Create an AI agent for {selectedClient?.name} first.
+                                  Bland AI will create voice-enabled versions of your existing agents.
                                 </p>
                                 <Button onClick={() => navigate('/agents/new')}>
                                   Create AI Agent

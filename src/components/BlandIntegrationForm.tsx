@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,13 @@ export const BlandIntegrationForm = ({ clientId, agents, onSuccess }: BlandInteg
     speed: 1.0,
   });
   const { toast } = useToast();
+
+  // Auto-select the first agent if available
+  React.useEffect(() => {
+    if (agents.length > 0 && !formData.agent_id) {
+      setFormData(prev => ({ ...prev, agent_id: agents[0].id }));
+    }
+  }, [agents, formData.agent_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
