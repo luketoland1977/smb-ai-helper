@@ -19,6 +19,7 @@ import NotFound from "./pages/NotFound";
 import WebSocketTest from "./components/WebSocketTest";
 import VoiceDemo from "./pages/VoiceDemo";
 import VoiceSettings from "./pages/VoiceSettings";
+import WorkflowWizard from "./components/workflow/WorkflowWizard";
 
 const queryClient = new QueryClient();
 
@@ -116,6 +117,14 @@ const App = () => (
             />
             <Route path="/chat/:agentId" element={<Chat />} />
             <Route path="/websocket-test" element={<WebSocketTest />} />
+            <Route 
+              path="/workflow" 
+              element={
+                <ProtectedRoute roles={['admin', 'salesperson']}>
+                  <WorkflowWizard />
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/widgets" 
               element={

@@ -150,9 +150,28 @@ const AdminPanel = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Workflow Guide */}
+        {/* Workflow Wizard */}
         <div className="mb-12">
-          <WorkflowGuide />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Bot className="h-6 w-6 mr-2" />
+                Quick Setup Wizard
+              </CardTitle>
+              <CardDescription>
+                Need to set up a new AI service? Use our guided workflow to get started quickly.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => navigate('/workflow')}
+                className="w-full"
+                size="lg"
+              >
+                Start Setup Wizard
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Overview Stats */}
