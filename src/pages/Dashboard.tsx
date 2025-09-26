@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Bot, MessageSquare, Settings, Users, Phone, Mic, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Bot, MessageSquare, Settings, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 
@@ -14,15 +14,6 @@ interface Client {
   domain: string;
   subdomain: string;
   created_at: string;
-  agent_count?: number;
-  widget_count?: number;
-  has_twilio?: boolean;
-  default_agent?: {
-    id: string;
-    name: string;
-    status: string;
-    openai_api_key?: string;
-  };
 }
 
 interface Agent {
@@ -31,9 +22,6 @@ interface Agent {
   description: string;
   status: string;
   created_at: string;
-  is_default: boolean;
-  template_type?: string;
-  client_name?: string;
 }
 
 const Dashboard = () => {
@@ -50,45 +38,22 @@ const Dashboard = () => {
 
   const loadData = async () => {
     try {
-      // Load clients with enhanced data including widget and integration counts
       const { data: clientsData } = await supabase
         .from('clients')
-        .select(`
-          *,
-          ai_agents!inner(id, name, status, is_default, openai_api_key),
-          chat_widgets(id),
-          voice_widgets(id),
-          twilio_integrations(id, is_active)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (clientsData) {
-        // Transform client data to include counts and default agent info
-        const enrichedClients = clientsData.map((client: any) => ({
-          ...client,
-          agent_count: client.ai_agents?.length || 0,
-          widget_count: (client.chat_widgets?.length || 0) + (client.voice_widgets?.length || 0),
-          has_twilio: client.twilio_integrations?.some((t: any) => t.is_active) || false,
-          default_agent: client.ai_agents?.find((a: any) => a.is_default) || null
-        }));
+        setClients(clientsData);
         
-        setClients(enrichedClients);
-        
-        // Load all agents with client information
-        const { data: agentsData } = await supabase
-          .from('ai_agents')
-          .select(`
-            *,
-            clients!inner(name)
-          `)
-          .order('created_at', { ascending: false });
+        if (clientsData.length > 0) {
+          const { data: agentsData } = await supabase
+            .from('ai_agents')
+            .select('*')
+            .in('client_id', clientsData.map(c => c.id))
+            .order('created_at', { ascending: false });
           
-        if (agentsData) {
-          const enrichedAgents = agentsData.map((agent: any) => ({
-            ...agent,
-            client_name: agent.clients?.name || 'Unknown Client'
-          }));
-          setAgents(enrichedAgents);
+          if (agentsData) setAgents(agentsData);
         }
       }
     } catch (error) {
@@ -138,59 +103,34 @@ const Dashboard = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <Bot className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{clients.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Complete environments
-              </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Agents</CardTitle>
-              <Bot className="h-4 w-4 text-muted-foreground" />
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
                 {agents.filter(a => a.status === 'active').length}
               </div>
-              <p className="text-xs text-muted-foreground">
-                AI assistants ready
-              </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Widgets</CardTitle>
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Integrations</CardTitle>
+              <Settings className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {clients.reduce((sum, client) => sum + (client.widget_count || 0), 0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Chat & voice widgets
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Phone Integrations</CardTitle>
-              <Phone className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {clients.filter(client => client.has_twilio).length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Twilio connected
-              </p>
+              <div className="text-2xl font-bold">0</div>
             </CardContent>
           </Card>
         </div>
@@ -212,40 +152,23 @@ const Dashboard = () => {
             <CardContent>
               {clients.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="mb-2">No clients yet. Create your first client to get started.</p>
-                  <p className="text-xs">Each client gets a complete AI environment automatically.</p>
+                  <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No clients yet. Create your first client to get started.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {clients.slice(0, 3).map((client) => (
-                    <div key={client.id} className="p-4 border border-border rounded-lg">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-medium">{client.name}</h3>
-                          <p className="text-sm text-muted-foreground">{client.domain}</p>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          {client.default_agent?.openai_api_key ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-yellow-500" />
-                          )}
-                          {client.has_twilio && <Phone className="h-4 w-4 text-blue-500" />}
-                        </div>
+                    <div key={client.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                      <div>
+                        <h3 className="font-medium">{client.name}</h3>
+                        <p className="text-sm text-muted-foreground">{client.domain}</p>
                       </div>
-                      
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-                        <span>Agent: {client.default_agent?.name || 'Not configured'}</span>
-                        <span>{client.widget_count || 0} widgets</span>
-                      </div>
-                      
                       <div className="flex space-x-2">
                         <Button variant="outline" size="sm" onClick={() => navigate(`/clients/${client.id}/knowledge-base`)}>
                           Knowledge Base
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => navigate(`/clients/${client.id}`)}>
-                          Configure
+                          Manage
                         </Button>
                       </div>
                     </div>
@@ -276,35 +199,24 @@ const Dashboard = () => {
             <CardContent>
               {agents.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="mb-2">No agents created yet.</p>
-                  <p className="text-xs">Agents are created automatically with each client.</p>
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No agents created yet. Create your first AI agent.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {agents.slice(0, 3).map((agent) => (
-                    <div key={agent.id} className="p-4 border border-border rounded-lg">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-medium">{agent.name}</h3>
-                            {agent.is_default && (
-                              <Badge variant="outline" className="text-xs">Default</Badge>
-                            )}
-                            <Badge variant={agent.status === 'active' ? 'default' : 'secondary'}>
-                              {agent.status}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{agent.client_name}</p>
+                    <div key={agent.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium">{agent.name}</h3>
+                          <Badge variant={agent.status === 'active' ? 'default' : 'secondary'}>
+                            {agent.status}
+                          </Badge>
                         </div>
+                        <p className="text-sm text-muted-foreground">{agent.description}</p>
                       </div>
-                      
-                      <div className="text-xs text-muted-foreground mb-3">
-                        Template: {agent.template_type || 'general'}
-                      </div>
-                      
                       <Button variant="outline" size="sm" onClick={() => navigate(`/agents/${agent.id}`)}>
-                        Configure Agent
+                        Configure
                       </Button>
                     </div>
                   ))}

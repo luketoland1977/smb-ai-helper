@@ -1,8 +1,5 @@
 project_id = "ycvvuepfsebqpwmamqgg"
 
-[functions.bland-integration]
-verify_jwt = false
-
 [functions.chat-with-agent]
 verify_jwt = false
 
@@ -22,10 +19,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.twilio-voice-integration]
-verify_jwt = false
-
-[functions.twilio-client-config]
-verify_jwt = false
-
-[functions.knowledge-search]
 verify_jwt = false

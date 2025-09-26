@@ -3,13 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import VoiceInterface from '@/components/VoiceInterface';
-import ChatWidget from '@/components/ChatWidget';
-import { Phone, Globe, Mic, Users, ArrowRight, CheckCircle, MessageSquare } from 'lucide-react';
+import { Phone, Globe, Mic, Users, ArrowRight, CheckCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 const VoiceDemo = () => {
   const { toast } = useToast();
-  const [selectedDemo, setSelectedDemo] = useState<'phone' | 'web' | 'chat' | null>(null);
+  const [selectedDemo, setSelectedDemo] = useState<'phone' | 'web' | null>(null);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -19,7 +18,7 @@ const VoiceDemo = () => {
     });
   };
 
-  const demoPhoneNumber = "Not configured"; // No active Twilio integration found
+  const demoPhoneNumber = "(844) 415-2896";
   const demoEmbedCode = `<!-- AI Voice Assistant Widget -->
 <script>
   window.voiceWidgetConfig = {
@@ -50,7 +49,7 @@ const VoiceDemo = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Demo Options */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">{/* Changed to 3 columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
           
           {/* Phone Demo */}
           <Card className={`cursor-pointer transition-all duration-200 ${selectedDemo === 'phone' ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-md'}`}>
@@ -82,14 +81,15 @@ const VoiceDemo = () => {
             </CardHeader>
 
             <CardContent>
-              <div className="bg-orange-50 rounded-lg p-6 text-center mb-6 border border-orange-200">
-                <h3 className="font-semibold text-lg mb-2 text-orange-800">Demo Phone Integration</h3>
-                <div className="text-lg font-semibold text-orange-600 mb-2">
-                  ⚠️ Setup Required
+              <div className="bg-gray-50 rounded-lg p-6 text-center mb-6">
+                <h3 className="font-semibold text-lg mb-2">Demo Phone Number</h3>
+                <div 
+                  className="text-3xl font-bold text-blue-600 cursor-pointer hover:text-blue-700"
+                  onClick={() => copyToClipboard(demoPhoneNumber)}
+                >
+                  {demoPhoneNumber}
                 </div>
-                <p className="text-sm text-orange-700">
-                  No Twilio integration configured. Configure a Twilio phone number in the admin panel to enable phone demos.
-                </p>
+                <p className="text-sm text-gray-600 mt-2">Click to copy • Available 24/7</p>
               </div>
 
               <div className="space-y-3">
@@ -102,18 +102,13 @@ const VoiceDemo = () => {
                 </Button>
                 
                 {selectedDemo === 'phone' && (
-                  <div className="bg-orange-50 rounded-lg p-4 space-y-2 text-sm border border-orange-200">
-                    <h4 className="font-semibold text-orange-900">Setup Required:</h4>
-                    <div className="space-y-1 text-orange-800">
-                      <p>1. Configure a Twilio account with phone number</p>
-                      <p>2. Add Twilio integration in the admin panel</p>
-                      <p>3. Set up webhook URLs for voice calls</p>
-                      <p>4. Test the integration with a real phone call</p>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-orange-200">
-                      <p className="text-xs text-orange-600">
-                        Visit the admin panel to configure your Twilio integration and get a working demo phone number.
-                      </p>
+                  <div className="bg-blue-50 rounded-lg p-4 space-y-2 text-sm">
+                    <h4 className="font-semibold text-blue-900">How to test:</h4>
+                    <div className="space-y-1 text-blue-800">
+                      <p>1. Call {demoPhoneNumber} from any phone</p>
+                      <p>2. Wait for the AI greeting</p>
+                      <p>3. Speak naturally - ask questions or request help</p>
+                      <p>4. The AI will respond in real-time</p>
                     </div>
                   </div>
                 )}
@@ -167,148 +162,17 @@ const VoiceDemo = () => {
                     />
                     
                     <div className="bg-purple-50 rounded-lg p-4">
-                      <h4 className="font-semibold text-purple-900 mb-2">Direct Integration:</h4>
+                      <h4 className="font-semibold text-purple-900 mb-2">Integration Code:</h4>
                       <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
                         <pre>{demoEmbedCode}</pre>
                       </div>
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="mt-2 mr-2"
+                        className="mt-2"
                         onClick={() => copyToClipboard(demoEmbedCode)}
                       >
                         Copy Code
-                      </Button>
-                    </div>
-
-                    <div className="bg-purple-50 rounded-lg p-4">
-                      <h4 className="font-semibold text-purple-900 mb-2">Iframe Integration:</h4>
-                      <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
-                        <pre>{`<iframe 
-  src="${window.location.origin}/voice-widget-iframe.html?clientId=demo&agentId=demo&color=%23764ba2" 
-  width="350" 
-  height="400" 
-  frameborder="0"
-  title="AI Voice Widget">
-</iframe>`}</pre>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={() => copyToClipboard(`<iframe src="${window.location.origin}/voice-widget-iframe.html?clientId=demo&agentId=demo&color=%23764ba2" width="350" height="400" frameborder="0" title="AI Voice Widget"></iframe>`)}
-                      >
-                        Copy Iframe Code
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Chat Widget Demo */}
-          <Card className={`cursor-pointer transition-all duration-200 ${selectedDemo === 'chat' ? 'ring-2 ring-green-500 shadow-lg' : 'hover:shadow-md'}`}>
-            <CardHeader>
-              <div className="flex items-center gap-3 mb-4">
-                <MessageSquare className="w-8 h-8 text-green-600" />
-                <div>
-                  <CardTitle className="text-2xl">Chat Widget</CardTitle>
-                  <CardDescription className="text-base">
-                    Traditional text-based chat widget for websites
-                  </CardDescription>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span>Classic chat experience</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span>Works on all devices</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span>Instant text responses</span>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent>
-              <div className="space-y-4">
-                <Button 
-                  className="w-full bg-green-600 hover:bg-green-700" 
-                  onClick={() => setSelectedDemo(selectedDemo === 'chat' ? null : 'chat')}
-                >
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  {selectedDemo === 'chat' ? 'Hide Chat Widget' : 'Try Chat Widget'}
-                </Button>
-                
-                {selectedDemo === 'chat' && (
-                  <div className="space-y-4">
-                    <div className="bg-green-50 rounded-lg p-4 text-sm">
-                      <h4 className="font-semibold text-green-900 mb-2">How to test:</h4>
-                      <div className="space-y-1 text-green-800">
-                        <p>1. Click the chat button in the bottom-left corner</p>
-                        <p>2. Type a message and press enter</p>
-                        <p>3. AI will respond with text messages</p>
-                        <p>4. Perfect for FAQ and support</p>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-green-50 rounded-lg p-4">
-                      <h4 className="font-semibold text-green-900 mb-2">Direct Integration:</h4>
-                      <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
-                        <pre>{`<!-- AI Chat Widget -->
-<script>
-  window.chatWidgetConfig = {
-    clientId: 'demo-client',
-    agentId: 'demo-agent',
-    position: 'bottom-right',
-    primaryColor: '#16a34a'
-  };
-</script>
-<script src="${window.location.origin}/widget.js"></script>`}</pre>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2 mr-2"
-                        onClick={() => copyToClipboard(`<!-- AI Chat Widget -->
-<script>
-  window.chatWidgetConfig = {
-    clientId: 'demo-client',
-    agentId: 'demo-agent',
-    position: 'bottom-right',
-    primaryColor: '#16a34a'
-  };
-</script>
-<script src="${window.location.origin}/widget.js"></script>`)}
-                      >
-                        Copy Code
-                      </Button>
-                    </div>
-
-                    <div className="bg-green-50 rounded-lg p-4">
-                      <h4 className="font-semibold text-green-900 mb-2">Iframe Integration:</h4>
-                      <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
-                        <pre>{`<iframe 
-  src="${window.location.origin}/chat-widget-iframe.html?clientId=demo&agentId=demo&color=%2316a34a" 
-  width="350" 
-  height="500" 
-  frameborder="0"
-  title="AI Chat Widget">
-</iframe>`}</pre>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={() => copyToClipboard(`<iframe src="${window.location.origin}/chat-widget-iframe.html?clientId=demo&agentId=demo&color=%2316a34a" width="350" height="500" frameborder="0" title="AI Chat Widget"></iframe>`)}
-                      >
-                        Copy Iframe Code
                       </Button>
                     </div>
                   </div>
@@ -336,13 +200,7 @@ const VoiceDemo = () => {
                   <th className="text-center py-4 px-4">
                     <div className="flex items-center justify-center gap-2">
                       <Globe className="w-5 h-5 text-purple-600" />
-                      <span>Voice Widget</span>
-                    </div>
-                  </th>
-                  <th className="text-center py-4 px-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <MessageSquare className="w-5 h-5 text-green-600" />
-                      <span>Chat Widget</span>
+                      <span>Web Widget</span>
                     </div>
                   </th>
                 </tr>
@@ -356,9 +214,6 @@ const VoiceDemo = () => {
                   <td className="py-4 px-4 text-center">
                     <Badge variant="outline" className="bg-yellow-50 text-yellow-700">Medium</Badge>
                   </td>
-                  <td className="py-4 px-4 text-center">
-                    <Badge variant="outline" className="bg-green-50 text-green-700">Simple</Badge>
-                  </td>
                 </tr>
                 <tr className="border-b">
                   <td className="py-4 px-4 font-medium">Device Compatibility</td>
@@ -368,27 +223,20 @@ const VoiceDemo = () => {
                   <td className="py-4 px-4 text-center">
                     <Badge variant="outline" className="bg-blue-50 text-blue-700">Modern Browsers</Badge>
                   </td>
-                  <td className="py-4 px-4 text-center">
-                    <Badge variant="outline" className="bg-green-50 text-green-700">Universal</Badge>
-                  </td>
                 </tr>
                 <tr className="border-b">
-                  <td className="py-4 px-4 font-medium">Interaction Type</td>
+                  <td className="py-4 px-4 font-medium">Lead Capture</td>
                   <td className="py-4 px-4 text-center">
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700">Voice Only</Badge>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700">Phone Number</Badge>
                   </td>
                   <td className="py-4 px-4 text-center">
-                    <Badge variant="outline" className="bg-purple-50 text-purple-700">Voice + Text</Badge>
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <Badge variant="outline" className="bg-green-50 text-green-700">Text Only</Badge>
+                    <Badge variant="outline" className="bg-green-50 text-green-700">Full Details</Badge>
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-4 px-4 font-medium">Best For</td>
-                  <td className="py-4 px-4 text-center text-sm">Support Lines</td>
-                  <td className="py-4 px-4 text-center text-sm">Modern Sites</td>
-                  <td className="py-4 px-4 text-center text-sm">All Websites</td>
+                  <td className="py-4 px-4 font-medium">Use Cases</td>
+                  <td className="py-4 px-4 text-center text-sm">Support Lines, Sales</td>
+                  <td className="py-4 px-4 text-center text-sm">Website Visitors, FAQ</td>
                 </tr>
               </tbody>
             </table>
@@ -399,9 +247,9 @@ const VoiceDemo = () => {
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white p-8 text-center mt-12">
           <h2 className="text-3xl font-bold mb-4">Ready to Transform Your Customer Experience?</h2>
           <p className="text-xl mb-6 opacity-90">
-            Deploy AI assistants in minutes with phone, voice, or chat integration.
+            Deploy AI voice assistants in minutes, not months. Start with either phone or web integration.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">{/* ... rest of the content ... */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100">
               <Users className="w-5 h-5 mr-2" />
               Schedule Demo Call
@@ -411,17 +259,9 @@ const VoiceDemo = () => {
               Get Started Now
             </Button>
           </div>
-          </div>
         </div>
-
-        {/* Live Widgets */}
-        {selectedDemo === 'chat' && (
-          <ChatWidget 
-            position="bottom-left"
-            primaryColor="#16a34a"
-          />
-        )}
       </div>
+    </div>
   );
 };
 

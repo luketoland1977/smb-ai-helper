@@ -17,22 +17,10 @@ import {
   Globe,
   FileText,
   UserCheck,
-  Zap,
-  Trash2
+  Zap
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import WorkflowGuide from '@/components/WorkflowGuide';
 
 interface Client {
@@ -95,39 +83,6 @@ const AdminPanel = () => {
     }
   };
 
-  const handleDeleteAgent = async (agentId: string, agentName: string) => {
-    try {
-      // Delete agent configurations first
-      await supabase
-        .from('agent_configurations')
-        .delete()
-        .eq('agent_id', agentId);
-
-      // Delete the agent
-      const { error } = await supabase
-        .from('ai_agents')
-        .delete()
-        .eq('id', agentId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: `Agent "${agentName}" has been deleted`,
-      });
-
-      // Reload data
-      loadData();
-    } catch (error) {
-      console.error('Error deleting agent:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete agent",
-        variant: "destructive",
-      });
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -150,28 +105,9 @@ const AdminPanel = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Workflow Wizard */}
+        {/* Workflow Guide */}
         <div className="mb-12">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Bot className="h-6 w-6 mr-2" />
-                Quick Setup Wizard
-              </CardTitle>
-              <CardDescription>
-                Need to set up a new AI service? Use our guided workflow to get started quickly.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={() => navigate('/workflow')}
-                className="w-full"
-                size="lg"
-              >
-                Start Setup Wizard
-              </Button>
-            </CardContent>
-          </Card>
+          <WorkflowGuide />
         </div>
 
         {/* Overview Stats */}
@@ -337,62 +273,6 @@ const AdminPanel = () => {
           </div>
         )}
 
-        {/* Voice Integrations Section */}
-        {(hasRole('admin') || hasRole('salesperson')) && (
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center">
-              <Headphones className="h-5 w-5 mr-2 text-primary" />
-              Voice Integrations
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/voice-demo')}>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg">
-                    <Headphones className="h-5 w-5 mr-2" />
-                    Voice Demo
-                  </CardTitle>
-                  <CardDescription>Test Twilio and Bland AI voice integrations</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="outline" className="w-full">
-                    Try Voice Demo
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg">
-                    <Bot className="h-5 w-5 mr-2" />
-                    Bland AI Integration
-                  </CardTitle>
-                  <CardDescription>Configure Bland AI voice agents for automated calls</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="outline" className="w-full" onClick={() => navigate('/voice-settings')}>
-                    Manage Bland AI
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg">
-                    <Settings className="h-5 w-5 mr-2" />
-                    Voice Settings
-                  </CardTitle>
-                  <CardDescription>Configure voice settings for all integrations</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="outline" className="w-full" onClick={() => navigate('/voice-settings')}>
-                    Voice Settings
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
         {/* Support Section */}
         {(hasRole('admin') || hasRole('salesperson') || hasRole('support')) && (
           <div className="mb-8">
@@ -510,38 +390,9 @@ const AdminPanel = () => {
                           <p className="text-sm text-muted-foreground truncate">{agent.description}</p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => navigate(`/agents/${agent.id}`)}>
-                          Configure
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => navigate(`/agents/${agent.id}/voice-settings`)}>
-                          <Headphones className="w-4 h-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Agent</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete "{agent.name}"? This action cannot be undone and will remove all associated configurations.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteAgent(agent.id, agent.name)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => navigate(`/agents/${agent.id}`)}>
+                        Configure
+                      </Button>
                     </div>
                   ))}
                   {agents.length > 4 && (

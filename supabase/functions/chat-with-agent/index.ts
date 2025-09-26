@@ -117,10 +117,10 @@ Please use this information to provide accurate, helpful responses. If the knowl
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in chat-with-agent function:', error);
     return new Response(JSON.stringify({ 
-      error: error.message || 'Internal server error'
+      error: error.message || 'Internal server error' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
