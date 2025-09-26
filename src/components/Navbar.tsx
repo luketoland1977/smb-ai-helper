@@ -26,7 +26,7 @@ const Navbar = () => {
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center gap-2">
               <Bot className="h-8 w-8 text-accent" />
-              <span className="text-xl font-bold text-white">AI Service Pro</span>
+              <span className="text-xl font-bold text-white">1ServiceAI</span>
             </div>
           </div>
           <div className="hidden md:block">
